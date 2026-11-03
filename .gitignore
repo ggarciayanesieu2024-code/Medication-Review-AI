@@ -1,0 +1,17 @@
+# Each contributor creates their own environment and local key file.
+.venv/
+.env
+
+# Python/editor generated files.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.vscode/
+.idea/
+
+# Local vector index and model caches.
+.chroma/
+chroma_db/
+.cache/

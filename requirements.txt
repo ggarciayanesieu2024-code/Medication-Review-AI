@@ -1,0 +1,10 @@
+# Direct project dependencies. The app has not been implemented yet.
+streamlit
+requests
+beautifulsoup4
+sentence-transformers
+chromadb
+openai
+pydantic
+python-dotenv
+pytest
