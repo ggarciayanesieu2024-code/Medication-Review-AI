@@ -19,3 +19,4 @@ data/raw/nomenclator/
 data/processed/
 .env
 .venv/
+data/raw/cima/

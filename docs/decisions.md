@@ -134,7 +134,7 @@ These rules are not negotiable and apply to every part of the system.
 - **Where:** <http://listadomedicamentos.aemps.gob.es/prescripcion.zip>
 - **How:** Downloaded by `src/download_nomenclator.py`.
 - **Why:** It is the authoritative source of medicines, codes (including ATC)
-  and identifiers needed to build synthetic patients and detect duplicates.
+  and identifiers needed to build synthetic patients and detect duplicates. to be verified after download
 
 ### 4.2 CIMA REST API
 
@@ -168,3 +168,72 @@ These rules are not negotiable and apply to every part of the system.
    nomenclator.
 4. Download the drug sections for those medicines from CIMA.
 5. Build the vector index.
+
+---
+
+## 7. Integración con la API de CIMA (verificado)
+
+This section records what has been checked against real CIMA responses. Raw
+responses are saved, unmodified, in `data/raw/cima/`.
+
+### 7.1 Verified endpoints
+
+All endpoints are relative to <https://cima.aemps.es/cima/rest>.
+
+| Endpoint | Returns |
+|----------|---------|
+| `medicamentos?nombre=` | A paginated search result (`totalFilas`, `pagina`, `tamanioPagina`, `resultados`). |
+| `medicamento?nregistro=` | The full record of one medicine, including `docs` with links to its technical sheet. |
+| `docSegmentado/secciones/1?nregistro=` | The list of sections in the technical sheet (`seccion`, `titulo`, `orden`), without their text. |
+| `docSegmentado/contenido/1?nregistro=&seccion=` | The text of the requested section and its subsections. |
+
+- **Where the section endpoints come from:** the official manual
+  `CIMA_REST_API.pdf` v1.23
+  (<https://cima.aemps.es/cima/resources/docs/CIMA_REST_API.pdf>).
+- **Why not Swagger:** the Swagger page
+  (<https://cima.aemps.es/cima/publico/swagger.html>) returns HTTP 404.
+- **How to call them:** with the header `Accept: application/json`. The `1` in
+  the path means technical sheet (`2` would be the patient leaflet).
+
+### 7.2 Response structure of `contenido`
+
+- **What:** The response is a **list**, not an object. Each element has:
+  - `seccion`: the section number, for example `4.5` or `4.6.1`;
+  - `titulo`: the section title;
+  - `orden`: the display order (it restarts for each main section, so it is not
+    a unique identifier);
+  - `contenido`: the section text, in HTML.
+- **Why it matters:** asking for one section can return several elements, one
+  for the section and one for each of its subsections.
+
+### 7.3 Chunking rule
+
+- **What:** One chunk per element **that has text**, labelled with its exact
+  number (`4.2`, `4.2.2`, `4.6.1`, ...). Elements with empty content are
+  discarded. Citations point to the exact subsection.
+- **How we found it:** the content is not placed consistently:
+  - in 66337, section `4.6` is empty and the text is in `4.6.1` and `4.6.2`;
+  - in 66337, section `4.2` has its own text, and `4.2.2` has separate text that
+    is not repeated in `4.2`.
+- **Why:** this rule covers both cases. Each citation points to the element
+  where the text really is, which keeps citation verification (3.7) exact.
+- This refines decision 3.6: the unit is the element returned by CIMA, not only
+  the main section.
+
+### 7.4 Checked with two technical sheets
+
+| nregistro | Medicine | Structure |
+|-----------|----------|-----------|
+| 66337 | Amoxicillin with clavulanic acid | 36 sections, with subsections (4.2.2, 4.6.1, 4.6.2, 5.2.x) |
+| 77758 | Paracetamol | 28 sections, no subsections |
+
+Section 4.5 has the same shape in both: a list with one element containing
+`seccion`, `titulo`, `orden` and `contenido`.
+
+### 7.5 Pending, not confirmed
+
+- **Gaps in numbering:** the `orden` values in the section lists skip numbers
+  (for example 3→6 or 9→11). We do not yet know what these gaps correspond to.
+- **HTML cleaning:** stripping the HTML must keep the breaks between paragraphs.
+  A naive clean-up joins headings and paragraphs (for example "Anticoagulantes
+  orales Los anticoagulantes..."), which could make citation checks fail.
