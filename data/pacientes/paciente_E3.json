@@ -1,0 +1,32 @@
+{
+  "id": "E3",
+  "edad": 74,
+  "grupo": "evaluacion",
+  "medicamentos": [
+    {
+      "nregistro": "59718",
+      "nombre": "Besitran 100 mg comprimidos recubiertos con película",
+      "dosis": "1 comprimido al día",
+      "prescriptor": "Dr. Ibáñez (Psiquiatría)"
+    },
+    {
+      "nregistro": "63064",
+      "nombre": "Aldocumar 5 mg comprimidos",
+      "dosis": "según pauta indicada por el control de INR",
+      "prescriptor": "Dr. Gómez (Cardiología)"
+    }
+  ],
+  "expected_result": {
+    "duplicidades": [],
+    "interacciones": [
+      {
+        "par": ["59718", "63064"],
+        "cita_principal": "59718, sección 4.5, apartado Warfarina",
+        "solo_contexto": "59718, sección 4.4 (sangrado; remite a 4.5)"
+      }
+    ],
+    "cambios_de_tratamiento": [],
+    "recomendacion": "consultar al médico"
+  },
+  "hypothesis": "The system must detect the sertraline-warfarin interaction and cite section 4.5 of 59718 (subsection Warfarina) as the primary source. Section 4.4 may appear only as context. If the system cites 4.4 as the source, the test fails, even if the warning also appears there."
+}

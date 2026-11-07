@@ -1,0 +1,31 @@
+{
+  "id": "E1",
+  "edad": 71,
+  "grupo": "evaluacion",
+  "medicamentos": [
+    {
+      "nregistro": "88372",
+      "nombre": "Ibudol 400 mg cápsulas blandas",
+      "dosis": "1 cápsula cada 8 horas si hay dolor",
+      "prescriptor": "Dra. Ortega (Traumatología)"
+    },
+    {
+      "nregistro": "66327",
+      "nombre": "Geloprofen 400 mg comprimidos recubiertos con película",
+      "dosis": "1 comprimido cada 8 horas si hay dolor",
+      "prescriptor": "Dr. Navarro (Atención Primaria)"
+    }
+  ],
+  "expected_result": {
+    "duplicidades": [
+      {
+        "cod_principio_activo": "2765",
+        "nregistros": ["88372", "66327"],
+        "prescriptores": ["Dra. Ortega", "Dr. Navarro"]
+      }
+    ],
+    "interacciones": [],
+    "cambios_de_tratamiento": []
+  },
+  "hypothesis": "The system must flag a duplicity for active ingredient 2765 (ibuprofen), naming both nregistros and both prescribers. It must not raise an interaction alert or recommend any treatment change."
+}

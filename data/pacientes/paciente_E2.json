@@ -1,0 +1,34 @@
+{
+  "id": "E2",
+  "edad": 81,
+  "grupo": "evaluacion",
+  "medicamentos": [
+    {
+      "nregistro": "65461",
+      "nombre": "Amlodipino Cinfa 10 mg",
+      "dosis": "1 comprimido al día",
+      "prescriptor": "Dr. López (Cardiología)"
+    },
+    {
+      "nregistro": "64140",
+      "nombre": "Furosemida Cinfa 40 mg",
+      "dosis": "1 comprimido por la mañana",
+      "prescriptor": "Dra. Medina (Atención Primaria)"
+    }
+  ],
+  "expected_result": {
+    "duplicidades": [],
+    "interacciones": [],
+    "cascadas": [
+      {
+        "desencadenante": "amlodipino",
+        "consecuencia": "edema",
+        "tratamiento": "furosemida",
+        "fuente": "data/cascadas.json",
+        "bibliografia": "Dreischulte T et al. Dtsch Arztebl Int 2022;119:745-52",
+        "presentacion": "hipótesis para comentar con el médico, no diagnóstico"
+      }
+    ]
+  },
+  "hypothesis": "The system must present a prescribing cascade (amlodipine, edema, furosemide) as a cited hypothesis from cascadas.json, never as a diagnosis. It must not raise duplicity or interaction alerts."
+}
