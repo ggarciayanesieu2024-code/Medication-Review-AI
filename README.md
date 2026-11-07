@@ -74,3 +74,8 @@ The files and folders above are placeholders for the group to fill in. `data/cas
 The course brief requires source code, clear run instructions, technical and end-to-end documentation, a presentation, and a live demo. This repository currently provides the starting structure for that work.
 
 Use **synthetic patient data only**. The eventual tool should support professional review and cite the exact source section for a finding. It must not diagnose or recommend stopping or changing treatment. Proposed clinical rules, including duplicate detection from ATC codes and prescribing-cascade examples, need source review and testing before implementation; the outline is a plan, not validated clinical logic.
+
+
+## Shared data
+
+Large generated files are not in Git. They are shared through the team Drive folder, with a `.txt` containing the SHA256 hash. Check the hash before use (`Get-FileHash <file> -Algorithm SHA256`).
