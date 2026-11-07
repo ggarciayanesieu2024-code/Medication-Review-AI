@@ -237,3 +237,8 @@ Section 4.5 has the same shape in both: a list with one element containing
 - **HTML cleaning:** stripping the HTML must keep the breaks between paragraphs.
   A naive clean-up joins headings and paragraphs (for example "Anticoagulantes
   orales Los anticoagulantes..."), which could make citation checks fail.
+
+
+
+
+Text check (step 6): three CIMA fragments were compared sentence by sentence with the official leaflet: 64014 (section 4.5, PPI), 59718 (section 4.5, warfarin) and 74483 (section 4.5). All sentences matched. Checked against the earlier file version; text is unchanged in v2 (99 fragments).
