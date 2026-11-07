@@ -1,0 +1,19 @@
+{
+  "id": "B",
+  "edad": 81,
+  "grupo": "desarrollo",
+  "medicamentos": [
+    {
+      "nregistro": "63064",
+      "nombre": "Aldocumar 5 mg comprimidos",
+      "dosis": "5 mg al día",
+      "prescriptor": "Dr. Gómez (Cardiología)"
+    },
+    {
+      "nregistro": "66337",
+      "nombre": "Amoxicilina/Ácido clavulánico SALA 500/50 mg",
+      "dosis": "500/50 mg cada 8 horas durante 7 días",
+      "prescriptor": "Dra. Pérez (Atención Primaria)"
+    }
+  ]
+}

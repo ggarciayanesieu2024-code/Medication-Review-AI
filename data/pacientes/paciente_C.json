@@ -1,0 +1,19 @@
+{
+  "id": "C",
+  "edad": 70,
+  "grupo": "desarrollo",
+  "medicamentos": [
+    {
+      "nregistro": "65461",
+      "nombre": "Amlodipino Cinfa 10 mg comprimidos EFG",
+      "dosis": "10 mg al día",
+      "prescriptor": "Dr. López (Cardiología)"
+    },
+    {
+      "nregistro": "55211",
+      "nombre": "Dianben 850 mg comprimidos",
+      "dosis": "850 mg cada 12 horas",
+      "prescriptor": "Dra. Sánchez (Endocrinología)"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "A",
+  "edad": 78,
+  "grupo": "desarrollo",
+  "medicamentos": [
+    {
+      "nregistro": "77758",
+      "nombre": "Paracetamol Abamed 1 g comprimidos EFG",
+      "dosis": "1 g cada 8 horas si hay dolor",
+      "prescriptor": "Dra. Martín (Traumatología)"
+    },
+    {
+      "nregistro": "85780",
+      "nombre": "Antidol 1 g comprimidos",
+      "dosis": "1 g cada 8 horas si hay dolor",
+      "prescriptor": "Dr. Ruiz (Atención Primaria)"
+    }
+  ]
+}
