@@ -79,3 +79,5 @@ Use **synthetic patient data only**. The eventual tool should support profession
 ## Shared data
 
 Large generated files are not in Git. They are shared through the team Drive folder, with a `.txt` containing the SHA256 hash. Check the hash before use (`Get-FileHash <file> -Algorithm SHA256`).
+
+Current CIMA file: `fragmentos_cima_2026-11-10_v3.json` (18 registration numbers, 99 fragments). Earlier versions are obsolete.
