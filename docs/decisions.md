@@ -242,3 +242,5 @@ Section 4.5 has the same shape in both: a list with one element containing
 
 
 Text check (step 6): three CIMA fragments were compared sentence by sentence with the official leaflet: 64014 (section 4.5, PPI), 59718 (section 4.5, warfarin) and 74483 (section 4.5). All sentences matched. Checked against the earlier file version; text is unchanged in v2 (99 fragments).
+
+Medicine replacement (10/11/2026): 77758 (Paracetamol Abamed 1 g) was revoked in CIMA (comerc: false), replaced by 68339 (Paracetamol Kern Pharma 1 g tablets, comerc: true, same active ingredient code 350). 66337 (Amoxicillin/clavulanate SALA 500/50 mg, intravenous, suspended in CIMA) was replaced by 65222 (Amoxicillin/clavulanate Tevagen 500/125 mg tablets, comerc: true, active ingredient codes 161 and 5419). Development patients A and B updated accordingly; fragmentos_cima.json regenerated (v3, 99 fragments, 18 nregistros).
