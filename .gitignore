@@ -20,3 +20,4 @@ data/processed/
 .env
 .venv/
 data/raw/cima/
+data/embeddings/
