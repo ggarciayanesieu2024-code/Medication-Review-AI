@@ -1,0 +1,47 @@
+
+{
+  "id": "EVAL_P4",
+  "edad": 76,
+  "grupo": "evaluacion",
+  "medicamentos": [
+    {
+      "nregistro": "69534",
+      "nombre": "ATORVASTATINA CINFA 10 mg COMPRIMIDOS RECUBIERTOS CON PELICULA EFG",
+      "dosis": "Pauta no especificada (caso ficticio)",
+      "prescriptor": "Dr. Romero (Cardiología)"
+    },
+    {
+      "nregistro": "67729",
+      "nombre": "LOSARTAN CINFA 50 mg COMPRIMIDOS RECUBIERTOS CON PELICULA EFG",
+      "dosis": "Pauta no especificada (caso ficticio)",
+      "prescriptor": "Dr. Romero (Cardiología)"
+    },
+    {
+      "nregistro": "77044",
+      "nombre": "LEVOTIROXINA SODICA TEVA 75 microgramos COMPRIMIDOS EFG",
+      "dosis": "Pauta no especificada (caso ficticio)",
+      "prescriptor": "Dra. Vega (Endocrinología)"
+    },
+    {
+      "nregistro": "76578",
+      "nombre": "METFORMINA AENOVA 1000 MG COMPRIMIDOS RECUBIERTOS CON PELICULA EFG",
+      "dosis": "Pauta no especificada (caso ficticio)",
+      "prescriptor": "Dra. Vega (Endocrinología)"
+    },
+    {
+      "nregistro": "66602",
+      "nombre": "OMEPRAZOL VIR 40 mg CAPSULAS DURAS GASTRORRESISTENTES",
+      "dosis": "Pauta no especificada (caso ficticio)",
+      "prescriptor": "Dra. Torres (Atención Primaria)"
+    }
+  ],
+  "resultado_esperado": {
+    "total_medicamentos": 5,
+    "total_prescriptores": 3,
+    "agrupacion_por_prescriptor": {
+      "Dr. Romero (Cardiología)": ["69534", "67729"],
+      "Dra. Vega (Endocrinología)": ["77044", "76578"],
+      "Dra. Torres (Atención Primaria)": ["66602"]
+    }
+  }
+}
