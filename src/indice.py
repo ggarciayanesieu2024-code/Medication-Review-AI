@@ -1,3 +1,7 @@
+# FOR FUTURE: CHATGPT mentioned something about how some sections larger than the
+# models input limit; definitely check out if true
+
+
 """
 Build the local search index from the cleaned CIMA fragments.
 
