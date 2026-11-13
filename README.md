@@ -80,3 +80,9 @@ Use **synthetic patient data only**. The eventual tool should support profession
 - Some mathematical symbols (≥, ≤) appear as `?` in certain fragments of `fragmentos_cima.json`. This comes from the leaflet published on CIMA, not from the parser: the same leaflet shows `?` on some lines and `≥` on others.
 - The affected fragments are in sections 4.2, 4.4 and 4.8 (Aldocumar, Ibudol and Januvia leaflets). None belongs to section 4.5, which the system uses to detect interactions.
 - Sentence-by-sentence verification against the official leaflet has been done for three section 4.5 fragments: 64014 (PPI), 59718 (warfarin) and 74483. The remaining fragments have not been compared.
+
+## Shared data
+
+Large generated files are not in Git. They are shared through the team Drive folder, with a `.txt` containing the SHA256 hash. Check the hash before use (`Get-FileHash <file> -Algorithm SHA256`).
+
+Current CIMA file: `fragmentos_cima_2026-11-10_v3.json` (18 registration numbers, 99 fragments). Earlier versions are obsolete.
