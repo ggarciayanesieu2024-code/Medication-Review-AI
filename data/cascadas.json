@@ -324,3 +324,46 @@
     "pregunta_medico": "¿El antipsicótico se añadió por agitación relacionada con la benzodiazepina? ¿Se ha revisado esta relación?",
     "verificado": true
   }
+[
+  {
+    "id": "C1",
+    "causa": { "nombre": "amlodipino", "cod_principio_activo": "7177" },
+    "efecto": "edema periférico",
+    "tratamiento": { "nombre": "furosemida", "cod_principio_activo": "2430" },
+    "hipotesis": "El amlodipino puede causar edema periférico, que a veces se trata con diuréticos sin abordar la causa.",
+    "caso_prueba": "E2",
+    "estado": "hipotesis_a_revisar"
+  },
+  {
+    "id": "C2",
+    "causa": { "nombre": "ibuprofeno", "cod_principio_activo": "2765" },
+    "efecto": "hemorragia digestiva",
+    "tratamiento": { "nombre": "pantoprazol", "cod_principio_activo": "9435" },
+    "hipotesis": "El ibuprofeno puede causar hemorragia digestiva, que a veces se trata con inhibidores de la bomba de protones.",
+    "estado": "hipotesis_a_revisar"
+  },
+  {
+    "id": "C3",
+    "causa": { "nombre": "ibuprofeno", "cod_principio_activo": "2765" },
+    "efecto": "hipertensión",
+    "tratamiento": { "nombre": "amlodipino", "cod_principio_activo": "7177" },
+    "hipotesis": "El ibuprofeno puede elevar la presión arterial, que a veces se trata con antihipertensivos sin revisar el antiinflamatorio.",
+    "estado": "hipotesis_a_revisar"
+  },
+  {
+    "id": "C4",
+    "causa": { "nombre": "simvastatina", "cod_principio_activo": "7502" },
+    "efecto": "miopatía",
+    "tratamiento": { "nombre": "ibuprofeno", "cod_principio_activo": "2765" },
+    "hipotesis": "Hipótesis de carácter docente: la simvastatina puede causar dolor muscular que se trata con analgésicos sin valorar la causa.",
+    "estado": "hipotesis_a_revisar"
+  },
+  {
+    "id": "C5",
+    "causa": { "nombre": "metformina", "cod_principio_activo": "4379" },
+    "efecto": "diarrea",
+    "tratamiento": { "nombre": "loperamida", "cod_principio_activo": "4564" },
+    "hipotesis": "La metformina puede causar diarrea, que a veces se trata con loperamida sin revisar el fármaco causal.",
+    "estado": "hipotesis_a_revisar"
+  }
+]

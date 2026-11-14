@@ -75,6 +75,11 @@ The course brief requires source code, clear run instructions, technical and end
 
 Use **synthetic patient data only**. The eventual tool should support professional review and cite the exact source section for a finding. It must not diagnose or recommend stopping or changing treatment. Proposed clinical rules, including duplicate detection from ATC codes and prescribing-cascade examples, need source review and testing before implementation; the outline is a plan, not validated clinical logic.
 
+## Known limitations of CIMA data
+
+- Some mathematical symbols (≥, ≤) appear as `?` in certain fragments of `fragmentos_cima.json`. This comes from the leaflet published on CIMA, not from the parser: the same leaflet shows `?` on some lines and `≥` on others.
+- The affected fragments are in sections 4.2, 4.4 and 4.8 (Aldocumar, Ibudol and Januvia leaflets). None belongs to section 4.5, which the system uses to detect interactions.
+- Sentence-by-sentence verification against the official leaflet has been done for three section 4.5 fragments: 64014 (PPI), 59718 (warfarin) and 74483. The remaining fragments have not been compared.
 
 ## Shared data
 
