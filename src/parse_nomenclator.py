@@ -22,14 +22,15 @@ Run from the project root:
 
 import json
 import xml.etree.ElementTree as ET
-from pathlib import Path
+if __package__:
+    from src.config import NOMENCLATOR_XML_FILE, PRESCRIPTIONS_FILE
+else:
+    from config import NOMENCLATOR_XML_FILE, PRESCRIPTIONS_FILE
 
 
 # Namespace declared at the top of Prescripcion.xml.
 NAMESPACE = "http://schemas.aemps.es/prescripcion/aemps_prescripcion"
 
-INPUT_FILE = Path("data") / "raw" / "nomenclator" / "Prescripcion.xml"
-OUTPUT_FILE = Path("data") / "processed" / "prescriptions.json"
 
 
 def tag(name: str) -> str:
@@ -120,7 +121,7 @@ def parse_prescription(record) -> dict:
 
 
 def main() -> None:
-    tree = ET.parse(INPUT_FILE)
+    tree = ET.parse(NOMENCLATOR_XML_FILE)
     root = tree.getroot()
 
     # The date in the header tells us how fresh the data is. We store it so
@@ -132,12 +133,12 @@ def main() -> None:
 
     output = {"listprescriptiondate": source_date, "prescripciones": prescriptions}
 
-    OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as output_file:
+    PRESCRIPTIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(PRESCRIPTIONS_FILE, "w", encoding="utf-8") as output_file:
         json.dump(output, output_file, ensure_ascii=False, indent=2)
 
     print(f"Parsed {len(prescriptions)} prescriptions (source date: {source_date})")
-    print(f"Saved to {OUTPUT_FILE}")
+    print(f"Saved to {PRESCRIPTIONS_FILE}")
 
     # A quick check that the data makes sense: find medicines named paracetamol.
     matches = [p for p in prescriptions if p["des_nomco"] and "PARACETAMOL" in p["des_nomco"].upper()]

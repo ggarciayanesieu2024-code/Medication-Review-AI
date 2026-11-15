@@ -1,10 +1,8 @@
 
 """Verify AI citations against official CIMA document fragments."""
 
-from src.modelos import Cita, Fragmento
-
-
-MIN_QUOTE_WORDS = 6
+from src.modelos import Citation, Fragment
+from src.config import MIN_QUOTE_WORDS
 
 
 def normalize_text(text: str) -> str:
@@ -12,7 +10,7 @@ def normalize_text(text: str) -> str:
     return " ".join(text.casefold().split())
 
 
-def verificar_cita(cita: Cita, fragmento: Fragmento) -> bool:
+def verificar_cita(cita: Citation, fragmento: Fragment) -> bool:
     """Check whether a citation matches its official source fragment."""
 
     # The medicine and document section must match.

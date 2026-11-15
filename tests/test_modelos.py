@@ -1,15 +1,18 @@
 
 """Tests for the shared RAG response data model."""
 
+import json
+
 import pytest
 from pydantic import ValidationError
 
-from src.modelos import RespuestaRAG
+from src.config import CASCADES_FILE
+from src.modelos import CascadeCase, CascadeMedication, StructuredOutputRAG
 
 
 def test_valid_rag_response():
     """Accept a valid response with a supporting citation."""
-    response = RespuestaRAG.model_validate({
+    response = StructuredOutputRAG.model_validate({
         "status": "found",
         "description": "Test explanation",
         "citations": [{
@@ -25,7 +28,7 @@ def test_valid_rag_response():
 
 def test_not_found_response():
     """Accept a response when no evidence is found."""
-    response = RespuestaRAG.model_validate({
+    response = StructuredOutputRAG.model_validate({
         "status": "not_found",
         "description": "No relevant evidence was found.",
         "citations": []
@@ -38,7 +41,7 @@ def test_not_found_response():
 def test_invalid_status():
     """Reject statuses not allowed by the RAG specification."""
     with pytest.raises(ValidationError):
-        RespuestaRAG.model_validate({
+        StructuredOutputRAG.model_validate({
             "status": "safe",
             "description": "Unsupported conclusion",
             "citations": []
@@ -48,7 +51,7 @@ def test_invalid_status():
 def test_missing_citation_field():
     """Reject a citation missing its source section."""
     with pytest.raises(ValidationError):
-        RespuestaRAG.model_validate({
+        StructuredOutputRAG.model_validate({
             "status": "found",
             "description": "Test explanation",
             "citations": [{
@@ -60,7 +63,7 @@ def test_missing_citation_field():
 def test_found_without_citations():
     """Reject a finding without supporting evidence."""
     with pytest.raises(ValidationError):
-        RespuestaRAG.model_validate({
+        StructuredOutputRAG.model_validate({
             "status": "found",
             "description": "Potential interaction found.",
             "citations": []
@@ -70,7 +73,7 @@ def test_found_without_citations():
 def test_not_found_with_citations():
     """Reject unsupported citations in a not_found response."""
     with pytest.raises(ValidationError):
-        RespuestaRAG.model_validate({
+        StructuredOutputRAG.model_validate({
             "status": "not_found",
             "description": "No relevant evidence found.",
             "citations": [{
@@ -79,3 +82,28 @@ def test_not_found_with_citations():
                 "literal_quote": "This is a sample quotation for testing"
             }]
         })
+
+
+def test_shared_cascade_data():
+    """The real shared file must load, validate, and have unique rule IDs."""
+    entries = json.loads(CASCADES_FILE.read_text(encoding="utf-8"))
+    assert entries
+    cascades = [CascadeCase.model_validate(entry) for entry in entries]
+    ids = [cascade.id for cascade in cascades]
+    assert len(ids) == len(set(ids))
+
+
+@pytest.mark.parametrize("codes", [
+    {"cod_principio_activo": ["2765"]},
+    {"cod_atc": ["M01A"]},
+    {"cod_principio_activo": ["2765"], "cod_atc": ["M01AE01"]},
+])
+def test_cascade_code_options(codes):
+    """Accept either type of identifier and combinations of both."""
+    CascadeMedication(nombre="Ibuprofeno", **codes)
+
+
+def test_cascade_requires_matching_codes():
+    """A medicine name alone is not a usable deterministic rule."""
+    with pytest.raises(ValidationError):
+        CascadeMedication(nombre="Ibuprofeno")

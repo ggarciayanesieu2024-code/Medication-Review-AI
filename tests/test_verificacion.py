@@ -1,17 +1,17 @@
 
 """Tests for CIMA citation verification."""
 
-from src.modelos import Cita, Fragmento
+from src.modelos import Citation, Fragment
 from src.verificacion import verificar_cita
 
 
 def test_valid_quote():
-    fragment = Fragmento(
+    fragment = Fragment(
         nregistro="123",
         seccion="4.5",
         texto="Este medicamento puede aumentar el efecto de otros medicamentos anticoagulantes.",
     )
-    citation = Cita(
+    citation = Citation(
         nregistro="123",
         seccion="4.5",
         literal_quote="puede aumentar el efecto de otros medicamentos",
@@ -21,12 +21,12 @@ def test_valid_quote():
 
 
 def test_invented_quote():
-    fragment = Fragmento(
+    fragment = Fragment(
         nregistro="123",
         seccion="4.5",
         texto="Este medicamento puede aumentar el efecto de otros medicamentos anticoagulantes.",
     )
-    citation = Cita(
+    citation = Citation(
         nregistro="123",
         seccion="4.5",
         literal_quote="Este medicamento elimina completamente todos los riesgos",
@@ -36,12 +36,12 @@ def test_invented_quote():
 
 
 def test_short_quote():
-    fragment = Fragmento(
+    fragment = Fragment(
         nregistro="123",
         seccion="4.5",
         texto="Este medicamento puede aumentar el efecto de otros medicamentos anticoagulantes.",
     )
-    citation = Cita(
+    citation = Citation(
         nregistro="123",
         seccion="4.5",
         literal_quote="aumentar el efecto",
@@ -51,12 +51,12 @@ def test_short_quote():
 
 
 def test_wrong_section():
-    fragment = Fragmento(
+    fragment = Fragment(
         nregistro="123",
         seccion="4.5",
         texto="Este medicamento puede aumentar el efecto de otros medicamentos anticoagulantes.",
     )
-    citation = Cita(
+    citation = Citation(
         nregistro="123",
         seccion="4.4",
         literal_quote="puede aumentar el efecto de otros medicamentos",

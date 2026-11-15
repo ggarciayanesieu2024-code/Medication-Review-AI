@@ -1,20 +1,21 @@
 """
-Prepare evidence-grounded prompts for the Medication Review RAG pipeline.
+Retrieve CIMA evidence, generate an answer, and check it before returning it.
 
 What this script does:
 1. Receives a question and optional medicine/section filters.
 2. Retrieves relevant CIMA fragments using busqueda.py.
 3. Optionally keeps only fragments mentioning another ingredient.
 4. Builds the instructions and source context for the language model.
-5. Returns the prepared request, including the retrieved fragments.
+5. Calls the shared Groq client and retries invalid JSON/schema output once.
+6. Rejects forbidden phrases and citations that fail source verification.
+7. Returns the outcome, accepted response, and retrieved fragments.
 
 General questions can search any indexed section.
 Interaction questions search section 4.5 and its subsections, and require
 a mention of the other ingredient before preparing an LLM request.
 
-This version prepares prompts only. It does not call Groq, validate model
-responses, or verify citations. Those steps need the shared components
-assigned to Person 4.
+The preparation functions remain available without calling the LLM.
+Use answer_question() or review_interaction() for the complete RAG flow.
 
 No retrieved evidence means "not found", never "safe" or "no interaction".
 """
@@ -22,7 +23,14 @@ No retrieved evidence means "not found", never "safe" or "no interaction".
 import json
 import unicodedata
 
+from groq import GroqError
+from pydantic import ValidationError
+
 from src.busqueda import search_fragments
+from src.config import FORBIDDEN_PHRASES, K_RESULTS
+from src.llm import llm_medication_review
+from src.modelos import Fragment, StructuredOutputRAG
+from src.verificacion import verificar_cita
 
 # Shared grounding, safety, and response-format instructions.
 # Both task-specific prompts include these rules.
@@ -188,7 +196,7 @@ def prepare_general_search(
     question: str,
     nregistro: str | None = None,
     sections: list[str] | None = None,
-    k: int = 3,
+    k: int = K_RESULTS,
     required_mention: str | None = None,
     system_prompt: str = GENERAL_SYSTEM_PROMPT,
 ) -> dict:
@@ -238,7 +246,7 @@ def prepare_general_search(
 def prepare_interaction_search(
     nregistro_x: str,
     ingredient_y: str,
-    k: int = 3,
+    k: int = K_RESULTS,
 ) -> dict:
     """Prepare an interaction question using medicine x's section 4.5."""
     ingredient_y = ingredient_y.strip()
@@ -257,3 +265,113 @@ def prepare_interaction_search(
         required_mention=ingredient_y,
         system_prompt=INTERACTION_SYSTEM_PROMPT,
     )
+
+
+def run_prepared_request(prepared: dict) -> dict:
+    """Generate and check an answer from a request prepared by this module.
+
+    Rejected answers are not returned. API failures remain separate from
+    missing evidence. Invalid search inputs and retrieval errors still raise.
+    """
+    result = {
+        "status": "not_found",
+        "question": prepared["question"],
+        "fragments": prepared["fragments"],
+        "response": None,
+        "reason": None,
+    }
+
+    # No sources means no API call, not a conclusion about medicine safety.
+    if not prepared["fragments"]:
+        result["reason"] = "no_evidence"
+        result["response"] = StructuredOutputRAG(
+            status="not_found",
+            description="No se encontró información relevante en los fragmentos consultados.",
+            citations=[],
+        ).model_dump()
+        return result
+
+    # Validate source shapes before paying for a generation request.
+    sources = [Fragment.model_validate(fragment) for fragment in prepared["fragments"]]
+    messages = list(prepared["messages"])
+
+    for attempt in range(2):
+        try:
+            response = llm_medication_review(messages)
+            break
+        except ValidationError:
+            if attempt == 1:
+                result.update(status="rejected", reason="invalid_response")
+                return result
+            # Reuse the same evidence and instructions for one fresh attempt.
+            messages.append({
+                "role": "user",
+                "content": (
+                    "The previous response failed JSON/schema validation. "
+                    "Return only the JSON object specified in the system prompt. "
+                    "Use status found or not_found, a nonempty description, and "
+                    "citations with nregistro, seccion, and literal_quote. "
+                    "found requires citations; not_found requires an empty list. "
+                    "Use only the original supplied evidence."
+                ),
+            })
+        except ValueError:
+            # The client rejects empty or token-truncated API responses.
+            result.update(status="rejected", reason="invalid_response")
+            return result
+        except (GroqError, RuntimeError):
+            # Includes API failures and a missing key; never label these not_found.
+            result.update(status="error", reason="generation_failed")
+            return result
+
+    # Apply the same normalisation to the phrase list and generated text.
+    # Check each field separately so phrases cannot span unrelated fields.
+    generated_texts = [response.description] + [
+        citation.literal_quote for citation in response.citations
+    ]
+    if any(
+        normalise_text(phrase) in normalise_text(text)
+        for text in generated_texts
+        for phrase in FORBIDDEN_PHRASES
+    ):
+        result.update(status="rejected", reason="forbidden_phrase")
+        return result
+
+    # Only sources actually supplied to this request can support its citations.
+    # Reject the whole answer if any citation fails, rather than keeping claims
+    # whose supporting quotation was removed.
+    for citation in response.citations:
+        if not any(verificar_cita(citation, source) for source in sources):
+            result.update(status="rejected", reason="invalid_citation")
+            return result
+
+    result["status"] = response.status
+    result["response"] = response.model_dump()
+    if response.status == "not_found":
+        result["reason"] = "insufficient_evidence"
+    return result
+
+
+def answer_question(
+    question: str,
+    nregistro: str | None = None,
+    sections: list[str] | None = None,
+    k: int = K_RESULTS,
+) -> dict:
+    """Retrieve evidence and return a checked answer to a general question."""
+    prepared = prepare_general_search(question, nregistro, sections, k)
+    return run_prepared_request(prepared)
+
+
+def review_interaction(
+    nregistro_x: str,
+    ingredient_y: str,
+    k: int = K_RESULTS,
+) -> dict:
+    """Review one medicine's interaction sections for another ingredient.
+
+    This checks one direction only. Reviewing both sheets requires a separate
+    call for the other medicine; patient-wide pair iteration is not done here.
+    """
+    prepared = prepare_interaction_search(nregistro_x, ingredient_y, k)
+    return run_prepared_request(prepared)

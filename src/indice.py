@@ -23,32 +23,40 @@ Run from the project root:
 """
 
 import json
-from pathlib import Path
 
 import chromadb
 from sentence_transformers import SentenceTransformer
 
-# Find the project root from this script's location.
-# This avoids depending on which folder the terminal is currently using.
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-INPUT_FILE = PROJECT_ROOT / "data" / "processed" / "fragmentos_cima.json"
-
-# Keep the downloaded model and generated database together.
-EMBEDDINGS_DIR = PROJECT_ROOT / "data" / "embeddings"
-DATABASE_DIR = EMBEDDINGS_DIR / "chroma_db"
-MODEL_CACHE_DIR = EMBEDDINGS_DIR / "E5_model"
-
-MODEL_NAME = "intfloat/multilingual-e5-small"
-COLLECTION_NAME = "cima_fragments"
-
-# Process several passages together rather than one at a time.
-BATCH_SIZE = 4
+# Support both `python -m src.indice` and `python src/indice.py`.
+if __package__:
+    from src.config import (
+        COLLECTION_NAME,
+        DATABASE_DIR,
+        DISTANCE_METRIC,
+        EMBEDDING_BATCH_SIZE,
+        EMBEDDING_DEVICE,
+        EMBEDDING_MODEL,
+        FRAGMENTS_FILE,
+        MODEL_CACHE_DIR,
+        NORMALIZE_EMBEDDINGS,
+    )
+else:
+    from config import (
+        COLLECTION_NAME,
+        DATABASE_DIR,
+        DISTANCE_METRIC,
+        EMBEDDING_BATCH_SIZE,
+        EMBEDDING_DEVICE,
+        EMBEDDING_MODEL,
+        FRAGMENTS_FILE,
+        MODEL_CACHE_DIR,
+        NORMALIZE_EMBEDDINGS,
+    )
 
 
 def main() -> None:
     # 1. Read the JSON file created by Lucia's CIMA parser.
-    with open(INPUT_FILE, encoding="utf-8") as input_file:
+    with open(FRAGMENTS_FILE, encoding="utf-8") as input_file:
         fragments = json.load(input_file)
 
     if not fragments:
@@ -88,10 +96,10 @@ def main() -> None:
 
     # 3. Load the embedding model.
     # The first run downloads it; later runs reuse the local cached files.
-    print(f"Loading embedding model: {MODEL_NAME}")
+    print(f"Loading embedding model: {EMBEDDING_MODEL}")
     model = SentenceTransformer(
-        MODEL_NAME,
-        device="cpu",
+        EMBEDDING_MODEL,
+        device=EMBEDDING_DEVICE,
         cache_folder=str(MODEL_CACHE_DIR),
     )
 
@@ -99,8 +107,8 @@ def main() -> None:
     # Normalisation puts the vectors on a common scale for comparison.
     embeddings = model.encode(
         passages,
-        batch_size=BATCH_SIZE,
-        normalize_embeddings=True,
+        batch_size=EMBEDDING_BATCH_SIZE,
+        normalize_embeddings=NORMALIZE_EMBEDDINGS,
         show_progress_bar=True,
     )
 
@@ -116,7 +124,7 @@ def main() -> None:
     collection = client.create_collection(
         name=COLLECTION_NAME,
         embedding_function=None,  # We provide our own E5 embeddings.
-        configuration={"hnsw": {"space": "cosine"}},
+        configuration={"hnsw": {"space": DISTANCE_METRIC}},
     )
 
     # 5. Store the vectors, original texts, and identifying metadata together.

@@ -18,17 +18,16 @@ Run from the project root:
 
 import xml.etree.ElementTree as ET
 from collections import Counter
-from pathlib import Path
 
 
-# Folder where download_nomenclator.py unpacked the ZIP.
-NOMENCLATOR_DIR = Path("data") / "raw" / "nomenclator"
+if __package__:
+    from src.config import NOMENCLATOR_DIR, NOMENCLATOR_XML_FILE
+else:
+    from config import NOMENCLATOR_DIR, NOMENCLATOR_XML_FILE
 
-# The file that contains the medicines themselves.
-MAIN_FILE = NOMENCLATOR_DIR / "Prescripcion.xml"
 
-# How many levels of nested tags to print when showing one record.
-PRINT_DEPTH = 3
+# How many levels of nested XML tags to print.
+XML_PRINT_DEPTH = 3
 
 
 def print_element(element, depth=0):
@@ -45,7 +44,7 @@ def print_element(element, depth=0):
         line += f" {element.attrib}"
     print(line)
 
-    if depth < PRINT_DEPTH:
+    if depth < XML_PRINT_DEPTH:
         for child in element:
             print_element(child, depth + 1)
 
@@ -88,7 +87,7 @@ def show_first_record(root) -> None:
 def main() -> None:
     summarise_files()
 
-    root = ET.parse(MAIN_FILE).getroot()
+    root = ET.parse(NOMENCLATOR_XML_FILE).getroot()
     list_all_tags(root)
     show_first_record(root)
 

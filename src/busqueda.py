@@ -28,12 +28,15 @@ from functools import lru_cache
 import chromadb
 from sentence_transformers import SentenceTransformer
 
-# Reuse the same paths, model, and collection as the indexing script.
-from src.indice import (
+# Indexing and search share settings from config.py.
+from src.config import (
     COLLECTION_NAME,
     DATABASE_DIR,
     MODEL_CACHE_DIR,
-    MODEL_NAME,
+    EMBEDDING_DEVICE,
+    EMBEDDING_MODEL,
+    K_RESULTS,
+    NORMALIZE_EMBEDDINGS,
 )
 
 
@@ -50,8 +53,8 @@ def load_search_resources():
     )
 
     model = SentenceTransformer(
-        MODEL_NAME,
-        device="cpu",
+        EMBEDDING_MODEL,
+        device=EMBEDDING_DEVICE,
         cache_folder=str(MODEL_CACHE_DIR),
     )
 
@@ -62,7 +65,7 @@ def search_fragments(
     question: str,
     nregistro: str | None = None,
     sections: list[str] | None = None,
-    k: int = 3,
+    k: int = K_RESULTS,
 ) -> list:
     """Retrieve up to k fragments, with optional medicine and section filters."""
     question = question.strip()
@@ -108,7 +111,7 @@ def search_fragments(
     # 3. Turn the question into a vector using E5's query prefix.
     query_embedding = model.encode(
         [f"query: {question}"],
-        normalize_embeddings=True,
+        normalize_embeddings=NORMALIZE_EMBEDDINGS,
         show_progress_bar=False,
     )
 
@@ -141,7 +144,7 @@ def search_fragments(
     return matches
 
 
-def search_for_pair(nregistro_x: str, ingredient_y: str, k: int = 3) -> list:
+def search_for_pair(nregistro_x: str, ingredient_y: str, k: int = K_RESULTS) -> list:
     """Search medicine x's interaction sections for ingredient y."""
     ingredient_y = ingredient_y.strip()
     if not ingredient_y:

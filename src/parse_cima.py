@@ -42,19 +42,18 @@ import urllib.request
 from pathlib import Path
 
 
-BASE_URL = "https://cima.aemps.es/cima/rest"
+if __package__:
+    from src.config import CIMA_RAW_DIR, FRAGMENTS_FILE
+else:
+    from config import CIMA_RAW_DIR, FRAGMENTS_FILE
 
-# Technical-sheet sections the project uses (see docs/decisions.md, 3.6).
+
+# Settings used only when downloading and parsing CIMA sections.
+CIMA_BASE_URL = "https://cima.aemps.es/cima/rest"
 WANTED_SECTIONS = {"4.2", "4.3", "4.4", "4.5", "4.8"}
-
-# Document type 1 is the technical sheet ("ficha tecnica") in CIMA.
-TECHNICAL_SHEET = 1
-
-RAW_DIR = Path("data") / "raw" / "cima"
-OUTPUT_FILE = Path("data") / "processed" / "fragmentos_cima.json"
-
-REQUEST_TIMEOUT_SECONDS = 30
-RETRY_DELAY_SECONDS = 2
+TECHNICAL_SHEET = 1  # CIMA document type for the technical sheet.
+CIMA_TIMEOUT_SECONDS = 30
+CIMA_RETRY_DELAY_SECONDS = 2
 
 logger = logging.getLogger("parse_cima")
 
@@ -82,13 +81,13 @@ def fetch_json(path: str, params: dict, raw_name: str | None, save_raw: bool):
     written to disk exactly as received, before decoding, so the saved file is
     never modified.
     """
-    url = f"{BASE_URL}/{path}?{urllib.parse.urlencode(params)}"
+    url = f"{CIMA_BASE_URL}/{path}?{urllib.parse.urlencode(params)}"
     request = urllib.request.Request(url, headers={"Accept": "application/json"})
 
     last_error = None
     for attempt in (1, 2):
         try:
-            with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+            with urllib.request.urlopen(request, timeout=CIMA_TIMEOUT_SECONDS) as response:
                 status = response.status
                 body = response.read()
             # NotFoundError is not caught by the except below, so it is not
@@ -102,12 +101,12 @@ def fetch_json(path: str, params: dict, raw_name: str | None, save_raw: bool):
             last_error = error
             logger.warning("Attempt %d failed for %s: %s", attempt, url, error)
             if attempt == 1:
-                time.sleep(RETRY_DELAY_SECONDS)
+                time.sleep(CIMA_RETRY_DELAY_SECONDS)
             continue
 
         if save_raw and raw_name:
-            RAW_DIR.mkdir(parents=True, exist_ok=True)
-            (RAW_DIR / raw_name).write_bytes(body)
+            CIMA_RAW_DIR.mkdir(parents=True, exist_ok=True)
+            (CIMA_RAW_DIR / raw_name).write_bytes(body)
 
         if isinstance(data, dict) and "error" in data:
             raise NotFoundError(f"{url}: not found ({data['error']})")
@@ -234,8 +233,8 @@ def parse_arguments():
         help="also save the unmodified CIMA responses to data/raw/cima/",
     )
     parser.add_argument(
-        "--salida", type=Path, default=OUTPUT_FILE,
-        help=f"where to write the chunks JSON (default: {OUTPUT_FILE})",
+        "--salida", type=Path, default=FRAGMENTS_FILE,
+        help=f"where to write the chunks JSON (default: {FRAGMENTS_FILE})",
     )
     return parser.parse_args()
 
