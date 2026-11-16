@@ -1,0 +1,25 @@
+{
+  "id": "E4",
+  "edad": 66,
+  "grupo": "evaluacion",
+  "medicamentos": [
+    {
+      "nregistro": "65879",
+      "nombre": "Simvastatina Pensa 10 mg comprimidos",
+      "dosis": "1 comprimido por la noche",
+      "prescriptor": "Dr. Lozano (Cardiología)"
+    },
+    {
+      "nregistro": "80733",
+      "nombre": "Atorvastatina Stada 80 mg comprimidos",
+      "dosis": "1 comprimido al día",
+      "prescriptor": "Dra. Vidal (Atención Primaria)"
+    }
+  ],
+  "expected_result": {
+    "duplicidades": [],
+    "interacciones": [],
+    "cambios_de_tratamiento": []
+  },
+  "hypothesis": "The system must not raise a duplicity alert, because the active ingredients differ (7502 vs 2856) even though both belong to ATC class C10AA. It must not raise an interaction alert, since neither section 4.5 mentions the other drug."
+}

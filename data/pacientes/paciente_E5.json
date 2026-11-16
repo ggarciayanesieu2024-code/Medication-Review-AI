@@ -1,0 +1,51 @@
+{
+  "id": "E5",
+  "edad": 79,
+  "grupo": "evaluacion",
+  "medicamentos": [
+    {
+      "nregistro": "74483",
+      "nombre": "Normogastrol 20 mg comprimidos gastrorresistentes",
+      "dosis": "1 comprimido en ayunas",
+      "prescriptor": "Dra. Medina (Atención Primaria)"
+    },
+    {
+      "nregistro": "71622",
+      "nombre": "Clopidogrel Cinfamed 75 mg comprimidos",
+      "dosis": "1 comprimido al día",
+      "prescriptor": "Dr. López (Cardiología)"
+    },
+    {
+      "nregistro": "64014",
+      "nombre": "Eutirox 100 µg comprimidos",
+      "dosis": "1 comprimido en ayunas",
+      "prescriptor": "Dra. Medina (Atención Primaria)"
+    },
+    {
+      "nregistro": "07383002",
+      "nombre": "Januvia 25 mg comprimidos",
+      "dosis": "1 comprimido al día",
+      "prescriptor": "Dr. Ruiz (Endocrinología)"
+    },
+    {
+      "nregistro": "73561",
+      "nombre": "Combiprasal 0,5/2,5 mg solución para nebulizador",
+      "dosis": "1 vial en nebulizador cada 6 horas si hay disnea",
+      "prescriptor": "Dra. Castillo (Neumología)"
+    }
+  ],
+  "expected_result": {
+    "duplicidades": [],
+    "interacciones": [
+      {
+        "par": ["64014", "74483"],
+        "cita_principal": "64014, sección 4.5, apartado Inhibidores de la bomba de protones (IBP)",
+        "mecanismo": "el IBP eleva el pH intragástrico y reduce la absorción de levotiroxina",
+        "recomendacion": "vigilar la función tiroidea"
+      }
+    ],
+    "agrupacion": "un grupo por prescriptor (4 grupos)",
+    "cambios_de_tratamiento": []
+  },
+  "hypothesis": "The system must group the five drugs by prescriber into four groups, raise no duplicity alert, and raise exactly one interaction alert: levothyroxine (64014) with pantoprazole (74483). The alert must cite section 4.5 of levothyroxine, subsection IBP. Section 4.5 of pantoprazole does not mention levothyroxine, so it must not be the source. No alert may appear between clopidogrel, sitagliptin, Combiprasal and the rest."
+}
