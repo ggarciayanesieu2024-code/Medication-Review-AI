@@ -1,0 +1,5 @@
+# Packages for the hosted demo (Streamlit Community Cloud). See streamlit_app.py.
+streamlit
+pydantic
+python-dotenv
+reportlab

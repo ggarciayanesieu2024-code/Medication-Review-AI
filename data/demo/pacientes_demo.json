@@ -1,0 +1,139 @@
+[
+  {
+    "id": "DEMO_D",
+    "edad": 83,
+    "grupo": "desarrollo",
+    "medicamentos": [
+      {
+        "nregistro": "55211",
+        "nombre": "Dianben 850 mg comprimidos",
+        "dosis": "850 mg cada 12 horas",
+        "prescriptor": "Dra. Sánchez (Endocrinología)"
+      },
+      {
+        "nregistro": "76578",
+        "nombre": "METFORMINA AENOVA 1000 MG COMPRIMIDOS RECUBIERTOS CON PELICULA EFG",
+        "dosis": "1000 mg al día",
+        "prescriptor": "Dr. Ruiz (Atención Primaria)"
+      },
+      {
+        "nregistro": "67729",
+        "nombre": "LOSARTAN CINFA 50 mg COMPRIMIDOS RECUBIERTOS CON PELICULA EFG",
+        "dosis": "50 mg al día",
+        "prescriptor": "Dr. López (Cardiología)"
+      }
+    ]
+  },
+  {
+    "id": "DEMO_E",
+    "edad": 85,
+    "grupo": "desarrollo",
+    "medicamentos": [
+      {
+        "nregistro": "63064",
+        "nombre": "Aldocumar 5 mg comprimidos",
+        "dosis": "5 mg al día",
+        "prescriptor": "Dr. Gómez (Cardiología)"
+      },
+      {
+        "nregistro": "85780",
+        "nombre": "Antidol 1 g comprimidos",
+        "dosis": "1 g cada 8 horas",
+        "prescriptor": "Dra. Navarro (Traumatología)"
+      },
+      {
+        "nregistro": "66602",
+        "nombre": "OMEPRAZOL VIR 40 mg CAPSULAS DURAS GASTRORRESISTENTES",
+        "dosis": "40 mg al día",
+        "prescriptor": "Dr. Ruiz (Atención Primaria)"
+      }
+    ]
+  },
+  {
+    "id": "DEMO_F",
+    "edad": 76,
+    "grupo": "desarrollo",
+    "medicamentos": [
+      {
+        "nregistro": "88372",
+        "nombre": "Ibudol 400 mg cápsulas blandas",
+        "dosis": "1 cápsula cada 8 horas si hay dolor",
+        "prescriptor": "Dra. Navarro (Traumatología)"
+      },
+      {
+        "nregistro": "65461",
+        "nombre": "Amlodipino Cinfa 10 mg comprimidos EFG",
+        "dosis": "10 mg al día",
+        "prescriptor": "Dr. López (Cardiología)"
+      }
+    ]
+  },
+  {
+    "id": "DEMO_G",
+    "edad": 87,
+    "grupo": "desarrollo",
+    "medicamentos": [
+      {
+        "nregistro": "65461",
+        "nombre": "Amlodipino Cinfa 10 mg comprimidos EFG",
+        "dosis": "10 mg al día",
+        "prescriptor": "Dr. López (Cardiología)"
+      },
+      {
+        "nregistro": "63064",
+        "nombre": "Aldocumar 5 mg comprimidos",
+        "dosis": "5 mg al día",
+        "prescriptor": "Dr. López (Cardiología)"
+      },
+      {
+        "nregistro": "55211",
+        "nombre": "Dianben 850 mg comprimidos",
+        "dosis": "850 mg cada 12 horas",
+        "prescriptor": "Dra. Sánchez (Endocrinología)"
+      },
+      {
+        "nregistro": "66602",
+        "nombre": "OMEPRAZOL VIR 40 mg CAPSULAS DURAS GASTRORRESISTENTES",
+        "dosis": "40 mg al día",
+        "prescriptor": "Dr. Molina (Aparato Digestivo)"
+      },
+      {
+        "nregistro": "65222",
+        "nombre": "Amoxicilina/Ácido clavulánico Tevagen 500/125 mg comprimidos",
+        "dosis": "1 comprimido cada 8 horas durante 7 días",
+        "prescriptor": "Dr. Ibáñez (Urgencias)"
+      }
+    ]
+  },
+  {
+    "id": "DEMO_H",
+    "edad": 78,
+    "grupo": "desarrollo",
+    "medicamentos": [
+      {
+        "nregistro": "88372",
+        "nombre": "Ibudol 400 mg cápsulas blandas",
+        "dosis": "1 cápsula cada 8 horas si hay dolor",
+        "prescriptor": "Dra. Navarro (Traumatología)"
+      },
+      {
+        "nregistro": "63064",
+        "nombre": "Aldocumar 5 mg comprimidos",
+        "dosis": "según pauta indicada por el control de INR",
+        "prescriptor": "Dr. Gómez (Cardiología)"
+      },
+      {
+        "nregistro": "85780",
+        "nombre": "Antidol 1 g comprimidos",
+        "dosis": "1 g cada 8 horas si hay dolor de cabeza",
+        "prescriptor": "Dr. Ruiz (Atención Primaria)"
+      },
+      {
+        "nregistro": "74483",
+        "nombre": "Normogastrol 20 mg comprimidos gastrorresistentes",
+        "dosis": "1 comprimido en ayunas",
+        "prescriptor": "Dr. Ruiz (Atención Primaria)"
+      }
+    ]
+  }
+]
