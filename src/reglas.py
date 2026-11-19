@@ -19,7 +19,10 @@ from pathlib import Path
 # Number of ATC characters that define a chemical subgroup (e.g. "N02BE").
 ATC_FAMILY_LENGTH = 5
 
-DEFAULT_CASCADES_PATH = Path(__file__).resolve().parent.parent / "data" / "cascadas.json"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_CASCADES_PATH = PROJECT_ROOT / "data" / "cascadas.json"
+# Output of src/parse_nomenclator.py (same path as PRESCRIPTIONS_FILE in config).
+DEFAULT_PRESCRIPTIONS_PATH = PROJECT_ROOT / "data" / "processed" / "prescriptions.json"
 
 
 # ---------------------------------------------------------------------------
@@ -81,12 +84,40 @@ def load_cascades(path: Path = DEFAULT_CASCADES_PATH) -> dict:
         return json.load(f)
 
 
+def load_drug_info(path: Path = DEFAULT_PRESCRIPTIONS_PATH) -> dict[str, dict]:
+    """Build the code lookup used by the rules from the parsed nomenclator.
+
+    Reads the file written by src/parse_nomenclator.py and returns a dictionary
+    that maps each nregistro (nro_definitivo) to:
+        {"atc": [cod_atc, ...], "active_ingredients": [cod_principio_activo, ...]}
+
+    The nomenclator has one record per package (cod_nacion), so the same
+    nregistro can appear several times. Its codes are merged into one entry.
+    """
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+
+    drug_info: dict[str, dict] = {}
+    for record in data["prescripciones"]:
+        nregistro = record.get("nro_definitivo")
+        if not nregistro:
+            continue
+        entry = drug_info.setdefault(nregistro, {"atc": [], "active_ingredients": []})
+        atc = record.get("cod_atc")
+        if atc and atc not in entry["atc"]:
+            entry["atc"].append(atc)
+        for component in record.get("composicion_pa", []):
+            code = component.get("cod_principio_activo")
+            if code and code not in entry["active_ingredients"]:
+                entry["active_ingredients"].append(code)
+    return drug_info
+
+
 def build_medications(patient: dict, drug_info: dict[str, dict]) -> list[Medication]:
     """Combine a patient's medicines with their codes from the nomenclator.
 
-    `drug_info` maps each nregistro to {"atc": [...], "active_ingredients": [...]}.
-    It should be built from the parsed nomenclator. If the parser uses other
-    key names, adapt them here only.
+    `drug_info` maps each nregistro to {"atc": [...], "active_ingredients": [...]},
+    as returned by load_drug_info().
     """
     medications = []
     for med in patient["medicamentos"]:
@@ -218,8 +249,18 @@ def find_cascades(medications: list[Medication], cascade_table: dict) -> list[Ca
 # All rules together
 # ---------------------------------------------------------------------------
 
-def run_rules(patient: dict, drug_info: dict[str, dict], cascade_table: dict | None = None) -> dict:
-    """Run the three rules on one patient and return all findings."""
+def run_rules(
+    patient: dict,
+    drug_info: dict[str, dict] | None = None,
+    cascade_table: dict | None = None,
+) -> dict:
+    """Run the three rules on one patient and return all findings.
+
+    If drug_info or cascade_table are not given, they are loaded from their
+    default files (data/processed/prescriptions.json and data/cascadas.json).
+    """
+    if drug_info is None:
+        drug_info = load_drug_info()
     if cascade_table is None:
         cascade_table = load_cascades()
     medications = build_medications(patient, drug_info)
