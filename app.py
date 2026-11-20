@@ -4,28 +4,49 @@ Run from the project root:
 
     streamlit run app.py
 
-For now the screen uses SAMPLE findings (data/demo/hallazgos_ejemplo.json).
-When the rules (Person 2) and the RAG pipeline (Person 3) are ready, connect
-them in run_review() and set USE_SAMPLE_FINDINGS = False.
+Two tabs:
+
+* Review current medicines - checks every medicine the patient already takes.
+* Check a new medicine - checks a medicine the prescriber is considering,
+  against the patient's current medicines, before it is prescribed.
+
+Both use the real system when it is available (see src/revision.py):
+Person 2's rules need data/processed/prescriptions.json; Person 3's model needs
+the full requirements, the search index and GROQ_API_KEY. The report always
+says which checks did not run. When neither part is available, the review tab
+shows SAMPLE findings (data/demo/hallazgos_ejemplo.json) under a "Sample data"
+banner, so the screen can still be shown.
 """
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import streamlit as st
 from pydantic import ValidationError
 
 from src.config import PATIENTS_DIR, PROJECT_ROOT
 from src.informe import generate_report, save_report
-from src.modelos import Patient
+from src.modelos import Medication, Patient
+from src.revision import (
+    check_new_medicine,
+    load_catalogue,
+    load_rule_data,
+    model_status,
+    planned_questions,
+    review_patient,
+    rules_status,
+)
 
 DEMO_DIR = PROJECT_ROOT / "data" / "demo"
 DEMO_PATIENTS_FILE = DEMO_DIR / "pacientes_demo.json"
 SAMPLE_FINDINGS_FILE = DEMO_DIR / "hallazgos_ejemplo.json"
 
-# Switch to False once run_review() calls the real rules and RAG pipeline.
-USE_SAMPLE_FINDINGS = True
+TYPE_LABELS = {
+    "duplicado": "Duplicates",
+    "advertencia_atc": "Same drug family",
+    "interaccion": "Interactions",
+    "cascada": "Possible cascades",
+}
 
 
 def load_patients() -> tuple[list[tuple[Patient, str]], list[str]]:
@@ -53,21 +74,61 @@ def load_sample_findings() -> dict:
     return json.loads(SAMPLE_FINDINGS_FILE.read_text(encoding="utf-8"))
 
 
-def run_review(patient: Patient) -> tuple[list[dict], list[str]]:
-    """Return (findings, pairs checked without information) for one patient.
+@st.cache_resource(show_spinner="Loading the nomenclator codes…")
+def cached_rule_data():
+    return load_rule_data()
 
-    TODO (integration), keeping this return shape:
-      - Person 2: duplicates, ATC warnings and cascades from src/reglas.py,
-        as Finding objects.
-      - Person 3: src.rag.review_interaction() for each medicine pair.
-        status "found"     -> Finding(tipo="interaccion", ...) with its citation
-        status "not_found" -> a short text for the pair, e.g. "A + B"
-        status "rejected"/"error" -> not shown; counted for the evaluation.
-    """
-    if USE_SAMPLE_FINDINGS:
-        entry = load_sample_findings().get(patient.id, {})
-        return entry.get("hallazgos", []), entry.get("pares_sin_informacion", [])
-    raise NotImplementedError("Connect the rules and RAG pipeline here.")
+
+def saved_files(report) -> dict:
+    paths = save_report(report)
+    return {kind: (path.name, path.read_bytes()) for kind, path in paths.items()}
+
+
+def show_counts(report, labels: list[tuple[str, str]]) -> None:
+    cols = st.columns(len(labels))
+    for col, (key, label) in zip(cols, labels):
+        col.metric(label, "Not checked" if key in report.unchecked else report.counts[key])
+
+
+def show_report(report, files: dict, key: str) -> None:
+    """Downloads plus the report itself, for either tab."""
+    if report.safety_flags:
+        st.warning(
+            f"{len(report.safety_flags)} generated text(s) were withheld because they "
+            "contained treatment-change wording."
+        )
+    pdf_name, pdf_bytes = files["pdf"]
+    html_name, html_bytes = files["html"]
+    st.markdown("**Download the report**")
+    d1, d2, d3 = st.columns([1, 1, 2])
+    d1.download_button("PDF", data=pdf_bytes, file_name=pdf_name,
+                       mime="application/pdf", key=f"{key}_pdf")
+    d2.download_button("Web page", data=html_bytes, file_name=html_name,
+                       mime="text/html", key=f"{key}_html")
+    d3.caption(
+        "PDF opens in Preview or any PDF reader. The web page opens in your browser "
+        "and can be printed. Both are also saved in `output/`."
+    )
+    st.divider()
+    st.markdown(report.markdown)
+
+
+def what_runs(rules_ready: bool, model_ready: bool) -> str:
+    parts = []
+    parts.append("duplicates, drug families and cascades (rules)" if rules_ready
+                 else "duplicates by ingredient name only (rules not available)")
+    parts.append("interactions in the technical sheets (model)" if model_ready
+                 else "no interactions (model not available)")
+    return "This check covers " + "; ".join(parts) + "."
+
+
+def progress_bar():
+    bar = st.progress(0.0, text="Starting…")
+
+    def update(done: int, total: int, label: str) -> None:
+        bar.progress(done / total if total else 1.0, text=label)
+
+    return bar, update
 
 
 st.set_page_config(page_title="Medication review", page_icon="💊", layout="wide")
@@ -79,12 +140,22 @@ st.caption(
 )
 
 patients, problems = load_patients()
+catalogue = load_catalogue()
+model_ready, model_message = model_status()
+rules_ready, rules_message = rules_status()
+rule_data = None
+if rules_ready:
+    try:
+        rule_data = cached_rule_data()
+    except Exception as exc:  # unreadable nomenclator file
+        rules_ready, rules_message = False, f"the nomenclator codes could not be read ({exc})."
+live = rules_ready or model_ready
 
 with st.sidebar:
     st.subheader("How it works")
     st.markdown(
         "1. Choose a patient.\n"
-        "2. Click **Review**.\n"
+        "2. **Review current medicines**, or **check a new medicine** before prescribing it.\n"
         "3. Read the report, or download it as a PDF or a web page.\n\n"
         "Each report is also saved in the `output/` folder."
     )
@@ -94,8 +165,18 @@ with st.sidebar:
         help="Evaluation patients are kept aside for the final evaluation. "
         "Build and test with development patients.",
     )
-    if USE_SAMPLE_FINDINGS:
-        st.warning("Using **sample findings**. They are placeholders, not clinical information.")
+    st.markdown("**System status**")
+    if rules_ready:
+        st.success("Rules: connected")
+    else:
+        st.info(f"Rules: not available. Reason: {rules_message}")
+    if model_ready:
+        st.success("Model: connected")
+    else:
+        st.info(f"Model: not available. Reason: {model_message}")
+    if not live:
+        st.warning("**Review current medicines** shows sample findings until the rules or the "
+                   "model are available. They are placeholders, not clinical information.")
     st.caption("Synthetic patients only.")
     for problem in problems:
         st.error(problem)
@@ -119,11 +200,6 @@ def patient_label(pid: str) -> str:
 patient_id = st.selectbox("Patient", list(by_id), format_func=patient_label)
 patient, _ = by_id[patient_id]
 
-if USE_SAMPLE_FINDINGS:
-    note = load_sample_findings().get(patient.id, {}).get("nota")
-    if note:
-        st.caption(note)
-
 prescribers = {m.prescriptor for m in patient.medicamentos}
 st.write(f"**{len(patient.medicamentos)} medicines** from **{len(prescribers)} prescribers**")
 with st.expander("Medicines on file"):
@@ -135,52 +211,126 @@ with st.expander("Medicines on file"):
         hide_index=True,
     )
 
-if st.button("Review", type="primary"):
-    try:
-        with st.spinner("Reviewing medicines…"):
-            findings, pairs = run_review(patient)
-            report = generate_report(
-                patient, findings, checked_without_evidence=pairs, sample=USE_SAMPLE_FINDINGS
-            )
-            paths = save_report(report)
-        st.session_state["result"] = {
-            "patient_id": patient.id,
-            "report": report,
-            "files": {kind: (path.name, path.read_bytes()) for kind, path in paths.items()},
-        }
-    except Exception as exc:  # show the problem on screen, not a stack trace
-        st.session_state.pop("result", None)
-        st.error(f"The review could not be completed: {exc}")
+tab_review, tab_check = st.tabs(["Review current medicines", "Check a new medicine"])
 
-result = st.session_state.get("result")
-if result and result["patient_id"] == patient.id:
-    report = result["report"]
-    c = report.counts
+# --------------------------------------------------------------------------
+# Tab 1: review the current medicines
+# --------------------------------------------------------------------------
+with tab_review:
+    if live:
+        st.caption(what_runs(rules_ready, model_ready))
+        if model_ready:
+            n = planned_questions(patient, None, catalogue)
+            st.caption(f"The model will be asked {n} question(s) for this patient, "
+                       "so it can take a minute.")
+    else:
+        note = load_sample_findings().get(patient.id, {}).get("nota")
+        if note:
+            st.caption(f"Sample: {note}")
 
-    cols = st.columns(4)
-    cols[0].metric("Duplicates", c["duplicado"])
-    cols[1].metric("Same group (ATC)", c["advertencia_atc"])
-    cols[2].metric("Interactions", c["interaccion"])
-    cols[3].metric("Possible cascades", c["cascada"])
+    if st.button("Review", type="primary", key="review"):
+        bar = None
+        try:
+            if live:
+                bar, update = progress_bar()
+                checked = review_patient(
+                    patient, catalogue, rule_data=rule_data, use_model=model_ready, progress=update,
+                )
+                report = generate_report(
+                    patient,
+                    checked.findings,
+                    checked_without_evidence=checked.checked_without_evidence,
+                    could_not_check=checked.could_not_check,
+                    unchecked_types=checked.unchecked,
+                )
+            else:
+                entry = load_sample_findings().get(patient.id, {})
+                report = generate_report(
+                    patient, entry.get("hallazgos", []),
+                    checked_without_evidence=entry.get("pares_sin_informacion", []), sample=True,
+                )
+            st.session_state["result"] = {
+                "patient_id": patient.id, "report": report, "files": saved_files(report),
+            }
+        except Exception as exc:  # show the problem on screen, not a stack trace
+            st.session_state.pop("result", None)
+            st.error(f"The review could not be completed: {exc}")
+        finally:
+            if bar is not None:
+                bar.empty()
 
-    if report.safety_flags:
-        st.warning(
-            f"{len(report.safety_flags)} generated text(s) were withheld because they "
-            "contained treatment-change wording."
-        )
+    result = st.session_state.get("result")
+    if result and result["patient_id"] == patient.id:
+        show_counts(result["report"], list(TYPE_LABELS.items()))
+        show_report(result["report"], result["files"], key="review")
+    else:
+        st.info("Click **Review** to see the report for this patient.")
 
-    pdf_name, pdf_bytes = result["files"]["pdf"]
-    html_name, html_bytes = result["files"]["html"]
-    st.markdown("**Download the report**")
-    d1, d2, d3 = st.columns([1, 1, 2])
-    d1.download_button("PDF", data=pdf_bytes, file_name=pdf_name, mime="application/pdf")
-    d2.download_button("Web page", data=html_bytes, file_name=html_name, mime="text/html")
-    d3.caption(
-        "PDF opens in Preview or any PDF reader. The web page opens in your browser "
-        "and can be printed. Both are also saved in `output/`."
+# --------------------------------------------------------------------------
+# Tab 2: check a new medicine before prescribing it
+# --------------------------------------------------------------------------
+with tab_check:
+    st.write(
+        "Choose the medicine you're thinking of prescribing. The system checks it against this "
+        "patient's current medicines and shows what the official technical sheets say, with "
+        "the quoted text. It does not decide whether to prescribe."
     )
+    choices = sorted(catalogue.values(), key=lambda e: e.nombre.casefold())
+    nregistro = st.selectbox(
+        "Medicine to prescribe",
+        options=[e.nregistro for e in choices],
+        format_func=lambda n: catalogue[n].nombre + ("" if catalogue[n].ficha
+                                                     else "  (technical sheet not in the system)"),
+        index=None,
+        placeholder="Choose a medicine",
+        help="Medicines without a technical sheet can still be checked, but only the other "
+        "medicines' sheets are searched for them.",
+    )
+    c1, c2 = st.columns(2)
+    dose = c1.text_input("Dose (optional)", placeholder="1 g cada 8 horas")
+    prescriber = c2.text_input("Prescriber (optional)", placeholder="Dra. Pérez (Atención Primaria)")
+    st.caption(what_runs(rules_ready, model_ready))
 
-    st.divider()
-    st.markdown(report.markdown)
-else:
-    st.info("Choose a patient and click **Review** to see the report.")
+    if st.button("Check", type="primary", key="check"):
+        if nregistro is None:
+            st.error("Choose a medicine first.")
+        else:
+            proposed = Medication(
+                nregistro=nregistro,
+                nombre=catalogue[nregistro].nombre,
+                dosis=dose.strip() or "Not specified",
+                prescriptor=prescriber.strip() or "Not specified",
+            )
+            bar, update = progress_bar()
+            try:
+                checked = check_new_medicine(
+                    patient, proposed, catalogue,
+                    rule_data=rule_data, use_model=model_ready, progress=update,
+                )
+                report = generate_report(
+                    patient,
+                    checked.findings,
+                    checked_without_evidence=checked.checked_without_evidence,
+                    could_not_check=checked.could_not_check,
+                    proposed=proposed,
+                    unchecked_types=checked.unchecked,
+                )
+                st.session_state["check_result"] = {
+                    "patient_id": patient.id, "report": report,
+                    "files": saved_files(report), "log": checked.log,
+                }
+            except Exception as exc:  # show the problem on screen, not a stack trace
+                st.session_state.pop("check_result", None)
+                st.error(f"The check could not be completed: {exc}")
+            finally:
+                bar.empty()
+
+    checked_result = st.session_state.get("check_result")
+    if checked_result and checked_result["patient_id"] == patient.id:
+        show_counts(checked_result["report"], [
+            ("duplicado", "Same ingredient"),
+            ("interaccion", "Interactions found"),
+            ("checked_without_evidence", "Nothing found"),
+            ("could_not_check", "Could not check"),
+        ])
+        show_report(checked_result["report"], checked_result["files"], key="check")

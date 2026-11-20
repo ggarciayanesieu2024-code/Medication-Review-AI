@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from src.config import FORBIDDEN_PHRASES, PROJECT_ROOT
-from src.modelos import Finding, Patient
+from src.modelos import Finding, Medication, Patient
 
 FOOTER = (
     "Automatically generated support information. "
@@ -138,15 +138,21 @@ class Report:
     counts: dict[str, int] = field(default_factory=dict)
     safety_flags: list[SafetyFlag] = field(default_factory=list)
     sample: bool = False
+    proposed_name: str | None = None
+    # Finding types that were not looked for (their sections say "Not checked").
+    unchecked: set[str] = field(default_factory=set)
 
     @property
     def title(self) -> str:
+        if self.proposed_name:
+            return f"Medicine check before prescribing - patient {self.patient_id}"
         return f"Medication review report - patient {self.patient_id}"
 
     @property
     def file_stem(self) -> str:
         safe_id = re.sub(r"[^A-Za-z0-9_-]", "_", self.patient_id)
-        return f"informe_{safe_id}_{self.generated_at:%Y%m%d_%H%M%S}"
+        kind = "comprobacion" if self.proposed_name else "informe"
+        return f"{kind}_{safe_id}_{self.generated_at:%Y%m%d_%H%M%S}"
 
     @property
     def markdown(self) -> str:
@@ -169,6 +175,9 @@ def generate_report(
     findings: Iterable[Finding | dict] | None = None,
     *,
     checked_without_evidence: Iterable[str] | None = None,
+    could_not_check: Iterable[str] | None = None,
+    proposed: Medication | dict | None = None,
+    unchecked_types: Iterable[str] = (),
     sample: bool = False,
     generated_at: datetime | None = None,
 ) -> Report:
@@ -177,10 +186,24 @@ def generate_report(
     ``checked_without_evidence`` lists the medicine pairs the interaction search
     looked at without finding information. They are shown separately, with a note
     that this does not mean the combination is safe.
+
+    ``could_not_check`` lists searches that did not finish (blocked answer,
+    unverifiable quotation, model unreachable). They are never shown as
+    "nothing found".
+
+    ``proposed`` turns the report into a check of a new medicine the prescriber
+    is considering: it is listed apart from the current medicines.
+
+    ``unchecked_types`` are Finding types that were not looked for at all; their
+    sections say "Not checked" instead of "None found".
     """
     patient = patient if isinstance(patient, Patient) else Patient.model_validate(patient)
     findings = [f if isinstance(f, Finding) else Finding.model_validate(f) for f in (findings or [])]
+    if proposed is not None and not isinstance(proposed, Medication):
+        proposed = Medication.model_validate(proposed)
     not_found = list(checked_without_evidence or [])
+    failed = list(could_not_check or [])
+    unchecked = set(unchecked_types)
     generated_at = generated_at or datetime.now()
     flags: list[SafetyFlag] = []
 
@@ -198,6 +221,8 @@ def generate_report(
     for med in patient.medicamentos:
         by_prescriber.setdefault(med.prescriptor, []).append(med)
     names = {med.nregistro: med.nombre for med in patient.medicamentos}
+    if proposed is not None:
+        names[proposed.nregistro] = proposed.nombre
 
     by_type = {tipo: [f for f in findings if f.tipo == tipo] for tipo, _, _ in FINDING_SECTIONS}
     counts = {
@@ -205,35 +230,56 @@ def generate_report(
         "prescribers": len(by_prescriber),
         **{tipo: len(items) for tipo, items in by_type.items()},
         "checked_without_evidence": len(not_found),
+        "could_not_check": len(failed),
     }
 
     blocks: list[Block] = []
     add = blocks.append
 
     # Header
-    add(Block("title", "Medication review report"))
-    add(Block("meta", items=[
+    meta = [
         ("Patient", f"{patient.id} · {patient.edad} years · "
                     f"{GROUP_LABELS.get(patient.grupo, patient.grupo)}"),
         ("Generated", f"{generated_at:%Y-%m-%d %H:%M}"),
-        ("Medicines reviewed", f"{counts['medicines']} from {counts['prescribers']} prescriber(s)"),
-    ]))
+    ]
+    if proposed is not None:
+        add(Block("title", "Medicine check before prescribing"))
+        meta += [
+            ("Proposed medicine", f"{proposed.nombre} · {proposed.dosis} · {proposed.prescriptor}"),
+            ("Current medicines", f"{counts['medicines']} from {counts['prescribers']} prescriber(s)"),
+        ]
+        add(Block("meta", items=meta))
+        add(Block("note", "This report checks a proposed medicine against the patient's current "
+                          "medicines, using the official technical sheets. It informs the "
+                          "prescriber; it is not a decision."))
+    else:
+        add(Block("title", "Medication review report"))
+        meta.append(("Medicines reviewed",
+                     f"{counts['medicines']} from {counts['prescribers']} prescriber(s)"))
+        add(Block("meta", items=meta))
     if sample:
         add(Block("banner", SAMPLE_BANNER, label="Sample data."))
 
     # Summary
     add(Block("h2", "Summary"))
-    summary_rows = [[title, str(counts[tipo])] for tipo, title, _ in FINDING_SECTIONS]
+    summary_rows = [[title, "Not checked" if tipo in unchecked else str(counts[tipo])]
+                    for tipo, title, _ in FINDING_SECTIONS]
     if not_found:
         summary_rows.append(["Pairs checked with no information found", str(len(not_found))])
+    if failed:
+        summary_rows.append(["Checks that could not be completed", str(len(failed))])
     add(Block("table", header=["Check", "Result"], rows=summary_rows))
 
     # 1. Medicines by prescriber
-    add(Block("h2", "1. Medicines by prescriber"))
+    add(Block("h2", "1. Current medicines by prescriber" if proposed else "1. Medicines by prescriber"))
     for prescriber, meds in by_prescriber.items():
         add(Block("h3", f"{prescriber} ({len(meds)})"))
         add(Block("table", header=["Medicine", "Dose", "Reg. no."],
                   rows=[[m.nombre, m.dosis, m.nregistro] for m in meds]))
+    if proposed is not None:
+        add(Block("h3", f"Proposed medicine, not yet prescribed: {proposed.prescriptor}"))
+        add(Block("table", header=["Medicine", "Dose", "Reg. no."],
+                  rows=[[proposed.nombre, proposed.dosis, proposed.nregistro]]))
 
     # 2-5. Findings
     for number, (tipo, title, intro) in enumerate(FINDING_SECTIONS, start=2):
@@ -241,7 +287,9 @@ def generate_report(
         if intro:
             add(Block("note", intro))
         items = by_type[tipo]
-        if not items:
+        if not items and tipo in unchecked:
+            add(Block("note", "Not checked: this part of the system was not available for this report."))
+        elif not items:
             add(Block("para", "None found."))
         for i, finding in enumerate(items, start=1):
             if len(items) > 1:
@@ -260,14 +308,22 @@ def generate_report(
             add(Block("note", "No information in the available documents does not mean "
                               "the combination is safe."))
 
-    # 6. Questions for the next appointment
+    # Checks that did not finish (never shown as "nothing found")
+    if failed:
+        add(Block("h2", "Checks that could not be completed"))
+        add(Block("bullets", items=failed))
+        add(Block("note", "These checks did not give a usable result, so these medicines "
+                          "or combinations need to be reviewed by hand."))
+
+    # 6. Questions
     questions: list[str] = []
     for finding in findings:
         q = screened(finding.pregunta_medico, f"{finding.tipo} question")
         if q and q not in questions:
             questions.append(q)
     questions.append(GENERAL_QUESTION)
-    add(Block("h2", "6. Questions for the next appointment"))
+    add(Block("h2", "6. Questions to consider before prescribing" if proposed
+              else "6. Questions for the next appointment"))
     add(Block("numbered", items=questions))
 
     # Footer: always last
@@ -280,6 +336,8 @@ def generate_report(
         counts=counts,
         safety_flags=flags,
         sample=sample,
+        proposed_name=proposed.nombre if proposed is not None else None,
+        unchecked=unchecked,
     )
 
 

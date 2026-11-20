@@ -80,9 +80,9 @@
     "hallazgos": [
       {
         "tipo": "cascada",
-        "descripcion": "Possible cascade C07 in the group's table: anti-inflammatories such as ibuprofen can raise blood pressure, which is sometimes treated with an antihypertensive such as amlodipine without reviewing the anti-inflammatory (Gurwitz et al., JAMA 1994).",
+        "descripcion": "C07: anti-inflammatories such as ibuprofen can raise blood pressure, and the patient also takes amlodipine, a blood-pressure medicine. Possible cascade to review.",
         "cita": null,
-        "pregunta_medico": "¿El antihipertensivo se empezó o se aumentó durante el tratamiento con el AINE? ¿Se ha revisado esta relación?"
+        "pregunta_medico": "Was the antihypertensive started or increased during NSAID treatment? Has this link been reviewed?"
       }
     ],
     "pares_sin_informacion": []
@@ -116,7 +116,7 @@
     ]
   },
   "DEMO_H": {
-    "nota": "Demo based on Carmen's story: a painkiller from traumatology, a blood thinner from cardiology, and a second painkiller and a stomach medicine from primary care.",
+    "nota": "Demo based on Carmen's story: a painkiller from traumatology, a blood thinner from cardiology, and a second painkiller and a stomach medicine from primary care. Three possible interactions.",
     "hallazgos": [
       {
         "tipo": "interaccion",
@@ -147,12 +147,6 @@
           "literal_quote": "[Sample placeholder: the verified quote from this CIMA section will appear here]"
         },
         "pregunta_medico": "Have Dr. Gómez (Cardiología) and Dr. Ruiz (Atención Primaria) reviewed the combined use of pantoprazole and Aldocumar?"
-      },
-      {
-        "tipo": "cascada",
-        "descripcion": "Possible cascade C14 in the group's table: ibuprofen can cause digestive bleeding, and pantoprazole may have been added to prevent or treat it.",
-        "cita": null,
-        "pregunta_medico": "¿El problema digestivo apareció durante el uso de ibuprofeno? ¿El pantoprazol se indicó como prevención o como tratamiento de ese problema?"
       }
     ],
     "pares_sin_informacion": []
