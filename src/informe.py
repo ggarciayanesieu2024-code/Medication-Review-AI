@@ -178,6 +178,7 @@ def generate_report(
     could_not_check: Iterable[str] | None = None,
     proposed: Medication | dict | None = None,
     unchecked_types: Iterable[str] = (),
+    interaction_note: str | None = None,
     sample: bool = False,
     generated_at: datetime | None = None,
 ) -> Report:
@@ -196,6 +197,9 @@ def generate_report(
 
     ``unchecked_types`` are Finding types that were not looked for at all; their
     sections say "Not checked" instead of "None found".
+
+    ``interaction_note`` is shown at the top of the interactions section, for
+    example to say the answers come from a stored run of the model.
     """
     patient = patient if isinstance(patient, Patient) else Patient.model_validate(patient)
     findings = [f if isinstance(f, Finding) else Finding.model_validate(f) for f in (findings or [])]
@@ -286,6 +290,8 @@ def generate_report(
         add(Block("h2", f"{number}. {title}"))
         if intro:
             add(Block("note", intro))
+        if tipo == "interaccion" and interaction_note and tipo not in unchecked:
+            add(Block("note", interaction_note))
         items = by_type[tipo]
         if not items and tipo in unchecked:
             add(Block("note", "Not checked: this part of the system was not available for this report."))

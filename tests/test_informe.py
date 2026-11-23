@@ -209,3 +209,70 @@ def test_save_report_writes_pdf_and_html(tmp_path):
     for path in paths.values():
         assert path.parent == tmp_path and path.name.startswith("informe_A_")
         assert path.stat().st_size > 0
+
+
+# ---------------------------------------------------------------- safety cases (deliverable 3)
+#
+# tests/fixtures/safety_cases.json holds unsafe sentences that must be blocked and
+# safe ones that must pass. Unsafe sentences marked "known_gap" are not caught by
+# the shared FORBIDDEN_PHRASES yet: they run as strict expected failures (XFAIL),
+# so a fix shows up as XPASS and the fixture must then be updated.
+
+from src.informe import _md  # noqa: E402  (Markdown escaping used by the report)
+
+SAFETY = json.loads((PROJECT_ROOT / "tests" / "fixtures" / "safety_cases.json").read_text(encoding="utf-8"))
+
+
+def _unsafe_params():
+    for case in SAFETY["unsafe"]:
+        marks = [pytest.mark.xfail(strict=True, reason="known gap: not in FORBIDDEN_PHRASES yet")] \
+            if case.get("known_gap") else []
+        yield pytest.param(case["text"], marks=marks, id=case["text"][:40])
+
+
+CAUGHT = [c["text"] for c in SAFETY["unsafe"] if not c.get("known_gap")]
+SAFE = [c["text"] for c in SAFETY["safe"]]
+
+
+def test_safety_cases_cover_both_languages():
+    for group in ("unsafe", "safe"):
+        assert {c["lang"] for c in SAFETY[group]} == {"en", "es"}
+        assert all(c["why"].strip() for c in SAFETY[group])
+    assert len(SAFETY["unsafe"]) >= 10 and len(SAFETY["safe"]) >= 10
+
+
+@pytest.mark.parametrize("text", list(_unsafe_params()))
+def test_unsafe_wording_is_caught(text):
+    assert find_forbidden_phrases(text), f"not blocked: {text!r}"
+
+
+@pytest.mark.parametrize("text", SAFE, ids=[t[:40] for t in SAFE])
+def test_safe_wording_passes(text):
+    assert find_forbidden_phrases(text) == []
+
+
+@pytest.mark.parametrize("text", CAUGHT, ids=[t[:40] for t in CAUGHT])
+def test_unsafe_generated_text_is_withheld_and_the_disclaimer_stays(text):
+    finding = {"tipo": "interaccion", "descripcion": text, "cita": None, "pregunta_medico": text}
+    report = generate_report(BY_ID["B"], [finding])
+    assert _md(text) not in report.markdown
+    assert len(report.safety_flags) == 2  # the description and the question
+    assert report.markdown.rstrip().endswith(f"*{FOOTER}*")
+    assert FOOTER in render_html(report)
+
+
+@pytest.mark.parametrize("text", SAFE, ids=[t[:40] for t in SAFE])
+def test_safe_generated_text_is_shown(text):
+    finding = {"tipo": "interaccion", "descripcion": text, "cita": None, "pregunta_medico": None}
+    report = generate_report(BY_ID["B"], [finding])
+    assert report.safety_flags == []
+    assert _md(text) in report.markdown
+
+
+def test_report_check_matches_the_rag_pipeline():
+    """The report and src/rag.py must normalise text the same way."""
+    rag = pytest.importorskip("src.rag", reason="model libraries not installed")
+    from src.informe import normalise_text
+
+    for case in SAFETY["unsafe"] + SAFETY["safe"]:
+        assert normalise_text(case["text"]) == rag.normalise_text(case["text"])

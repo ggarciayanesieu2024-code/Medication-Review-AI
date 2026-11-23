@@ -14,12 +14,17 @@ from src.config import FRAGMENTS_FILE, PATIENTS_DIR, PROJECT_ROOT
 from src.informe import FOOTER, generate_report
 from src.modelos import Medication, Patient
 from src.revision import (
+    all_questions,
     check_new_medicine,
     load_catalogue,
+    load_rule_data,
+    load_stored_answers,
     model_status,
     planned_questions,
     review_patient,
     rules_status,
+    save_answers,
+    stored_review,
 )
 
 CATALOGUE = load_catalogue()
@@ -84,6 +89,11 @@ def test_every_patient_medicine_is_in_the_list():
 def test_every_entry_has_an_ingredient():
     for entry in CATALOGUE.values():
         assert entry.principios_activos and all(i.strip() for i in entry.principios_activos)
+
+
+def test_every_entry_has_an_atc_code():
+    for entry in CATALOGUE.values():
+        assert entry.atc and all(len(code) == 7 for code in entry.atc), entry.nombre
 
 
 def test_list_matches_the_shared_cima_file():
@@ -229,14 +239,14 @@ def test_review_with_rules_finds_the_duplicate(rule_data):
 
 
 def test_new_medicine_can_complete_a_cascade(rule_data):
-    patient = _patient([("65461", "Dr. López (Cardiología)")])  # amlodipine
-    result = check_new_medicine(patient, _proposed("64140"), CATALOGUE,
-                                rule_data=rule_data, use_model=False)  # furosemide
+    patient = _patient([("88372", "Dra. Navarro (Traumatología)")])  # ibuprofen
+    result = check_new_medicine(patient, _proposed("65461"), CATALOGUE,
+                                rule_data=rule_data, use_model=False)  # amlodipine
     [cascade] = [f for f in result.findings if f.tipo == "cascada"]
-    assert cascade.descripcion.startswith("C01:")
-    assert "The proposed medicine, 'Furosemida Cinfa 40 mg'" in cascade.descripcion
-    assert "also takes 'Furosemida" not in cascade.descripcion
-    assert "diuretic" in cascade.pregunta_medico.lower()
+    assert cascade.descripcion.startswith("C07:")
+    assert "The proposed medicine, 'Amlodipino Cinfa 10 mg comprimidos EFG'" in cascade.descripcion
+    assert "'Ibudol 400 mg cápsulas blandas', which the patient already takes" in cascade.descripcion
+    assert "antihypertensive" in cascade.pregunta_medico.lower()
     assert result.unchecked == {"interaccion"}
 
 
@@ -245,6 +255,21 @@ def test_new_medicine_check_ignores_findings_between_current_medicines(rule_data
     result = check_new_medicine(patient, _proposed("63064"), CATALOGUE,
                                 rule_data=rule_data, use_model=False)
     assert result.findings == []
+
+
+def test_rules_run_with_the_medicine_list_codes_when_the_nomenclator_is_missing(tmp_path):
+    _real_rules()
+    codes = load_rule_data(tmp_path / "missing.json", CATALOGUE)
+    duplicate = review_patient(_patient([("68339", "Dra. Martín"), ("85780", "Dr. Ruiz")]),
+                               CATALOGUE, rule_data=codes)
+    assert [f.tipo for f in duplicate.findings] == ["duplicado"]
+    family = review_patient(_patient([("66602", "Dr. Ruiz"), ("74483", "Dr. Molina")]),  # two PPIs
+                            CATALOGUE, rule_data=codes)
+    assert [f.tipo for f in family.findings] == ["advertencia_atc"]
+    assert "A02BC" in family.findings[0].pregunta_medico
+    cascade = check_new_medicine(_patient([("88372", "Dra. Navarro")]), _proposed("65461"),
+                                 CATALOGUE, rule_data=codes, use_model=False)
+    assert [f.tipo for f in cascade.findings] == ["cascada"]
 
 
 def test_medicine_missing_from_the_nomenclator_is_reported(rule_data):
@@ -312,14 +337,58 @@ def test_rules_status_when_the_rules_file_is_broken(monkeypatch):
     assert not ready and "could not be loaded" in message
 
 
-def test_rules_status_without_nomenclator_file(monkeypatch, tmp_path):
+def test_rules_status_without_nomenclator_file_uses_the_medicine_list(monkeypatch, tmp_path):
     monkeypatch.setattr(revision, "_import_rules", lambda: None)
     ready, message = rules_status(tmp_path / "prescriptions.json")
-    assert not ready and "prescriptions.json" in message
+    assert ready and "medicine list" in message
 
 
-def test_rules_status_ready(monkeypatch, tmp_path):
+def test_rules_status_with_nomenclator_file(monkeypatch, tmp_path):
     monkeypatch.setattr(revision, "_import_rules", lambda: None)
     path = tmp_path / "prescriptions.json"
     path.write_text("{}", encoding="utf-8")
-    assert rules_status(path) == (True, "connected")
+    assert rules_status(path) == (True, "connected, using the nomenclator codes")
+
+
+# ---------------------------------------------------------------- stored model answers
+
+def test_all_questions_cover_every_sheet_without_asking_about_its_own_ingredient():
+    questions = all_questions(CATALOGUE)
+    assert len(questions) == len(set(questions))
+    for sheet, ingredient in questions:
+        entry = CATALOGUE[sheet]
+        assert entry.ficha and ingredient not in entry.principios_activos
+    assert ("88372", "warfarina") in questions and ("63064", "ibuprofeno") in questions
+
+
+def test_stored_answers_are_saved_resumed_and_reused(tmp_path):
+    path = tmp_path / "interacciones_guardadas.json"
+    questions = [("88372", "warfarina"), ("63064", "ibuprofeno"), ("88372", "amlodipino")]
+    model = FakeModel({("88372", "warfarina"): "found", ("88372", "amlodipino"): "error"})
+    counts = save_answers(path, model, questions, log=lambda _: None)
+    assert counts == {"asked": 3, "skipped": 0, "kept": 2, "retry_later": 1}
+
+    # A second run asks only the question that failed.
+    model2 = FakeModel()
+    counts = save_answers(path, model2, questions, log=lambda _: None)
+    assert model2.calls == [("88372", "amlodipino")] and counts["kept"] == 1
+
+    stored = load_stored_answers(path)
+    patient = _patient([("63064", "Dr. Gómez (Cardiología)"), ("65461", "Dr. López")])
+    result = check_new_medicine(patient, _proposed("88372"), CATALOGUE, review=stored_review(stored))
+    [finding] = [f for f in result.findings if f.tipo == "interaccion"]
+    assert finding.cita.nregistro == "88372"
+    # amlodipine's own sheet was never stored: reported, never "nothing found"
+    assert any("not in the stored model answers" in item for item in result.could_not_check)
+
+
+def test_no_stored_file_means_none(tmp_path):
+    assert load_stored_answers(tmp_path / "missing.json") is None
+
+
+def test_storing_script_stops_without_the_model(monkeypatch, capsys):
+    from src import guardar_interacciones
+
+    monkeypatch.setattr(guardar_interacciones, "model_status", lambda: (False, "no key"))
+    assert guardar_interacciones.main([]) == 1
+    assert "no key" in capsys.readouterr().out
