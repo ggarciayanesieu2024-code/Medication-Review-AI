@@ -1,0 +1,154 @@
+{
+  "_nota": "SAMPLE findings for building the interface (Person 5). Each 'hallazgos' list uses the shared Finding model in src/modelos.py. Quotes are placeholders, not CIMA text. They are replaced by the real rules (Person 2) and RAG pipeline (Person 3) when the app is connected. Do not use these as expected results for evaluation.",
+  "A": {
+    "nota": "Lucía's development patient A: the same painkiller (paracetamol) under two brand names from two doctors.",
+    "hallazgos": [
+      {
+        "tipo": "duplicado",
+        "descripcion": "Paracetamol Kern Pharma 1 g comprimidos EFG (Dra. Martín, Traumatología) and Antidol 1 g comprimidos (Dr. Ruiz, Atención Primaria) contain the same active ingredient: paracetamol.",
+        "cita": null,
+        "pregunta_medico": "Is the patient taking both paracetamol medicines, and what total daily amount of paracetamol does that add up to?"
+      }
+    ],
+    "pares_sin_informacion": []
+  },
+  "B": {
+    "nota": "Lucía's development patient B: a blood thinner (warfarin) plus an antibiotic from a different doctor.",
+    "hallazgos": [
+      {
+        "tipo": "interaccion",
+        "descripcion": "The amoxicillin/clavulanic acid technical sheet describes increases in INR in patients taking oral anticoagulants such as warfarin together with amoxicillin.",
+        "cita": {
+          "nregistro": "65222",
+          "seccion": "4.5",
+          "literal_quote": "[Sample placeholder: the verified quote from this CIMA section will appear here]"
+        },
+        "pregunta_medico": "Have Dr. Gómez (Cardiología) and Dra. Pérez (Atención Primaria) reviewed the combined use of Aldocumar and amoxicillin/clavulanic acid?"
+      }
+    ],
+    "pares_sin_informacion": [
+      "Aldocumar 5 mg sheet, searched for amoxicillin and clavulanic acid"
+    ]
+  },
+  "C": {
+    "nota": "Lucía's development patient C: two medicines from two doctors and nothing to flag. Shows a clean report.",
+    "hallazgos": [],
+    "pares_sin_informacion": [
+      "Amlodipino Cinfa 10 mg + Dianben 850 mg (metformin), both directions"
+    ]
+  },
+  "DEMO_D": {
+    "nota": "Demo: the same diabetes medicine (metformin) under two names from two doctors.",
+    "hallazgos": [
+      {
+        "tipo": "duplicado",
+        "descripcion": "Dianben 850 mg comprimidos (Dra. Sánchez, Endocrinología) and Metformina Aenova 1000 mg (Dr. Ruiz, Atención Primaria) contain the same active ingredient: metformin.",
+        "cita": null,
+        "pregunta_medico": "Is the patient taking both metformin medicines, and what total daily amount of metformin does that add up to?"
+      }
+    ],
+    "pares_sin_informacion": []
+  },
+  "DEMO_E": {
+    "nota": "Demo: a blood thinner plus a painkiller and a stomach medicine, each from a different doctor.",
+    "hallazgos": [
+      {
+        "tipo": "interaccion",
+        "descripcion": "The paracetamol technical sheet describes that regular use of paracetamol may increase the effect of oral anticoagulants such as warfarin.",
+        "cita": {
+          "nregistro": "85780",
+          "seccion": "4.5",
+          "literal_quote": "[Sample placeholder: the verified quote from this CIMA section will appear here]"
+        },
+        "pregunta_medico": "Have Dr. Gómez (Cardiología) and Dra. Navarro (Traumatología) reviewed the regular use of paracetamol together with Aldocumar?"
+      },
+      {
+        "tipo": "interaccion",
+        "descripcion": "The omeprazole technical sheet mentions that omeprazole may affect blood levels of warfarin and other vitamin K antagonists.",
+        "cita": {
+          "nregistro": "66602",
+          "seccion": "4.5",
+          "literal_quote": "[Sample placeholder: the verified quote from this CIMA section will appear here]"
+        },
+        "pregunta_medico": "Have Dr. Gómez (Cardiología) and Dr. Ruiz (Atención Primaria) reviewed the combined use of omeprazole and Aldocumar?"
+      }
+    ],
+    "pares_sin_informacion": []
+  },
+  "DEMO_F": {
+    "nota": "Demo: a possible prescribing cascade. A painkiller that can raise blood pressure, then a blood-pressure medicine from another doctor.",
+    "hallazgos": [
+      {
+        "tipo": "cascada",
+        "descripcion": "C07: anti-inflammatories such as ibuprofen can raise blood pressure, and the patient also takes amlodipine, a blood-pressure medicine. Possible cascade to review.",
+        "cita": null,
+        "pregunta_medico": "Was the antihypertensive started or increased during NSAID treatment? Has this link been reviewed?"
+      }
+    ],
+    "pares_sin_informacion": []
+  },
+  "DEMO_G": {
+    "nota": "Demo: five medicines from four doctors. The grouped list is the main value, with two possible interactions involving the blood thinner.",
+    "hallazgos": [
+      {
+        "tipo": "interaccion",
+        "descripcion": "The amoxicillin/clavulanic acid technical sheet describes increases in INR in patients taking oral anticoagulants such as warfarin together with amoxicillin.",
+        "cita": {
+          "nregistro": "65222",
+          "seccion": "4.5",
+          "literal_quote": "[Sample placeholder: the verified quote from this CIMA section will appear here]"
+        },
+        "pregunta_medico": "Have Dr. López (Cardiología) and Dr. Ibáñez (Urgencias) reviewed the combined use of Aldocumar and amoxicillin/clavulanic acid?"
+      },
+      {
+        "tipo": "interaccion",
+        "descripcion": "The omeprazole technical sheet mentions that omeprazole may affect blood levels of warfarin and other vitamin K antagonists.",
+        "cita": {
+          "nregistro": "66602",
+          "seccion": "4.5",
+          "literal_quote": "[Sample placeholder: the verified quote from this CIMA section will appear here]"
+        },
+        "pregunta_medico": "Have Dr. López (Cardiología) and Dr. Molina (Aparato Digestivo) reviewed the combined use of omeprazole and Aldocumar?"
+      }
+    ],
+    "pares_sin_informacion": [
+      "Amlodipino Cinfa 10 mg + Dianben 850 mg (metformin)"
+    ]
+  },
+  "DEMO_H": {
+    "nota": "Demo based on Carmen's story: a painkiller from traumatology, a blood thinner from cardiology, and a second painkiller and a stomach medicine from primary care. Three possible interactions.",
+    "hallazgos": [
+      {
+        "tipo": "interaccion",
+        "descripcion": "The ibuprofen technical sheet describes that anti-inflammatories such as ibuprofen may increase the effect of anticoagulants such as warfarin.",
+        "cita": {
+          "nregistro": "88372",
+          "seccion": "4.5",
+          "literal_quote": "[Sample placeholder: the verified quote from this CIMA section will appear here]"
+        },
+        "pregunta_medico": "Have Dra. Navarro (Traumatología) and Dr. Gómez (Cardiología) reviewed the combined use of ibuprofen and Aldocumar?"
+      },
+      {
+        "tipo": "interaccion",
+        "descripcion": "The paracetamol technical sheet describes that regular use of paracetamol may increase the effect of oral anticoagulants such as warfarin.",
+        "cita": {
+          "nregistro": "85780",
+          "seccion": "4.5",
+          "literal_quote": "[Sample placeholder: the verified quote from this CIMA section will appear here]"
+        },
+        "pregunta_medico": "Have Dr. Gómez (Cardiología) and Dr. Ruiz (Atención Primaria) reviewed the regular use of paracetamol together with Aldocumar?"
+      },
+      {
+        "tipo": "interaccion",
+        "descripcion": "The pantoprazole technical sheet mentions changes in INR in patients taking coumarin anticoagulants such as warfarin together with pantoprazole.",
+        "cita": {
+          "nregistro": "74483",
+          "seccion": "4.5",
+          "literal_quote": "[Sample placeholder: the verified quote from this CIMA section will appear here]"
+        },
+        "pregunta_medico": "Have Dr. Gómez (Cardiología) and Dr. Ruiz (Atención Primaria) reviewed the combined use of pantoprazole and Aldocumar?"
+      }
+    ],
+    "pares_sin_informacion": []
+  }
+}
