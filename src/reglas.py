@@ -1,4 +1,3 @@
-"""Placeholder for deterministic medication-review rules."""
 """Deterministic rules: duplicates, same-family warnings and prescribing cascades.
 
 No AI is used here. These checks work on structured codes (ATC and active
