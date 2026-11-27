@@ -1,4 +1,4 @@
-"""Tests for the report (src/informe.py) and its download formats (src/exportar.py).
+"""Tests for the report (src/Reports/informe.py) and its download formats (src/Reports/exportar.py).
 
 The full set of unsafe and safe example sentences (tests/fixtures/safety_cases.json)
 is Person 5's next deliverable; these tests cover the footer, the report structure,
@@ -10,9 +10,9 @@ from pathlib import Path
 import pytest
 
 from src.config import PATIENTS_DIR, PROJECT_ROOT
-from src.exportar import render_html, render_pdf
-from src.informe import FOOTER, find_forbidden_phrases, generate_report, save_report
-from src.modelos import Finding, Patient
+from src.Reports.exportar import render_html, render_pdf
+from src.Reports.informe import FOOTER, find_forbidden_phrases, generate_report, save_report
+from src.Reports.informe import Finding, Patient
 
 DEMO_DIR = PROJECT_ROOT / "data" / "demo"
 SAMPLE = json.loads((DEMO_DIR / "hallazgos_ejemplo.json").read_text(encoding="utf-8"))

@@ -6,7 +6,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from src import llm, rag
+from src import llm
+from src.Rag import rag
 
 
 @pytest.fixture
@@ -26,6 +27,7 @@ def pipeline(monkeypatch):
     monkeypatch.setattr(llm, "Groq", Mock(return_value=client))
     answer = {
         "status": "found",
+        "interaction_detected": True,
         "description": "Información para revisión profesional.",
         "citations": [{
             "nregistro": "0123",
@@ -177,3 +179,36 @@ def test_token_truncation_is_rejected_without_schema_retry(pipeline):
     assert result["status"] == "rejected"
     assert result["reason"] == "invalid_response"
     assert generate.call_count == 1
+
+
+@pytest.mark.parametrize("detected", [True, False])
+def test_interaction_evidence_keeps_its_explicit_classification(pipeline, detected):
+    _, generate, answer = pipeline
+    answer["interaction_detected"] = detected
+    generate.return_value = api_response(answer)
+    result = rag.review_interaction("0123", "warfarina")
+    assert result["status"] == "found"
+    assert result["response"]["interaction_detected"] is detected
+    assert result["response"]["citations"] == answer["citations"]
+
+
+def test_interaction_evidence_without_classification_is_rejected(pipeline):
+    _, generate, answer = pipeline
+    del answer["interaction_detected"]
+    generate.return_value = api_response(answer)
+    result = rag.review_interaction("0123", "warfarina")
+    assert result["status"] == "rejected"
+    assert result["reason"] == "invalid_response"
+    assert result["response"] is None
+
+
+def test_multiple_verified_citations_are_preserved(pipeline):
+    _, generate, answer = pipeline
+    answer["citations"].append({
+        "nregistro": "0123", "seccion": "4.5.1",
+        "literal_quote": "La warfarina puede aumentar el efecto de otros medicamentos",
+    })
+    generate.return_value = api_response(answer)
+    result = rag.review_interaction("0123", "warfarina")
+    assert result["status"] == "found"
+    assert result["response"]["citations"] == answer["citations"]

@@ -1,15 +1,19 @@
-"""Tests for the deterministic rules in src/reglas.py."""
+"""Tests for the deterministic rules in src/Cascades/reglas.py."""
 
 import json
 import sys
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.reglas import (  # noqa: E402
+from src.config import CASCADES_FILE
+from src.Cascades.reglas import (
+    CascadeCase,
+    CascadeTable,  # noqa: E402
     build_medications,
     find_cascades,
     find_duplicates,
@@ -23,10 +27,10 @@ PATIENTS_DIR = ROOT / "data" / "pacientes"
 
 # Codes checked in the AEMPS nomenclator (Prescripcion.xml, 2026-11-10).
 DRUG_INFO = {
-    "77758": {"atc": ["N02BE01"], "active_ingredients": ["350"]},   # Paracetamol Abamed 1 g
+    "68339": {"atc": ["N02BE01"], "active_ingredients": ["350"]},   # Paracetamol Kern Pharma 1 g
     "85780": {"atc": ["N02BE01"], "active_ingredients": ["350"]},   # Antidol 1 g
     "63064": {"atc": ["B01AA03"], "active_ingredients": ["4411"]},  # Aldocumar 5 mg
-    "66337": {"atc": ["J01CR02"], "active_ingredients": ["160", "5418"]},  # Amoxicillin/clavulanic acid
+    "65222": {"atc": ["J01CR02"], "active_ingredients": ["160", "5418"]},  # Amoxicillin/clavulanic acid
     "65461": {"atc": ["C08CA01"], "active_ingredients": ["7177"]},  # Amlodipine 10 mg
     "55211": {"atc": ["A10BA02"], "active_ingredients": ["4379"]},  # Dianben 850 mg
     # Invented entries for rule tests only (ATC codes are real, IDs are not).
@@ -74,6 +78,20 @@ def test_cascade_table_is_valid(cascades):
             assert source in cascades["sources"], f"{c['id']}: unknown source {source}"
 
 
+def test_load_cascades_preserves_shared_data(cascades):
+    raw = json.loads((ROOT / "data" / "cascadas.json").read_text(encoding="utf-8"))
+    assert cascades == raw
+
+
+def test_load_cascades_rejects_unknown_source(tmp_path):
+    data = json.loads((ROOT / "data" / "cascadas.json").read_text(encoding="utf-8"))
+    data["cascades"][0]["sources"] = ["missing-reference"]
+    path = tmp_path / "cascades.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValidationError, match="unknown source IDs"):
+        load_cascades(path)
+
+
 # --- Development patients ------------------------------------------------------
 
 def test_patient_a_has_paracetamol_duplicate(cascades):
@@ -93,7 +111,7 @@ def test_patients_b_and_c_have_no_rule_findings(name, cascades):
 # --- Rule 1: duplicates --------------------------------------------------------
 
 def test_combination_product_sharing_ingredient_is_duplicate():
-    meds = build_medications(make_patient("77758", "TEST-PARACETAMOL-CODEINE"), DRUG_INFO)
+    meds = build_medications(make_patient("68339", "TEST-PARACETAMOL-CODEINE"), DRUG_INFO)
     assert len(find_duplicates(meds)) == 1
 
 
@@ -113,7 +131,7 @@ def test_two_nsaids_give_family_warning_not_duplicate():
 
 
 def test_duplicate_pair_is_not_also_a_family_warning():
-    meds = build_medications(make_patient("77758", "85780"), DRUG_INFO)
+    meds = build_medications(make_patient("68339", "85780"), DRUG_INFO)
     assert find_family_warnings(meds) == []
 
 
@@ -145,7 +163,7 @@ def test_cascade_message_is_a_hypothesis(cascades):
 # --- Loading the parsed nomenclator --------------------------------------------------
 
 def test_load_drug_info_merges_packages_of_same_medicine(tmp_path):
-    # Same shape as the output of src/parse_nomenclator.py.
+    # Same shape as the output of src/Data/parse_nomenclator.py.
     parsed = {
         "listprescriptiondate": "2026-11-10",
         "prescripciones": [
@@ -171,3 +189,52 @@ def test_load_drug_info_merges_packages_of_same_medicine(tmp_path):
 def test_unknown_nregistro_raises_error():
     with pytest.raises(KeyError):
         build_medications(make_patient("00000"), DRUG_INFO)
+
+
+# --- Cascade schema validation -------------------------------------------------
+
+def test_shared_cascade_data():
+    """The complete file validates without changing its stored contents."""
+    entries = json.loads(CASCADES_FILE.read_text(encoding="utf-8"))
+    table = CascadeTable.model_validate(entries)
+    assert table.model_dump(exclude_unset=True) == entries
+
+
+@pytest.fixture
+def cascade_data():
+    return json.loads(CASCADES_FILE.read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("field,value", [
+    ("index_atc", []),
+    ("cascade_atc", []),
+    ("index_atc", [""]),
+    ("cascade_atc", [" C03"]),
+    ("exclude_atc", [" "]),
+    ("sources", []),
+    ("question", "   "),
+])
+def test_cascade_rejects_unusable_fields(cascade_data, field, value):
+    entry = cascade_data["cascades"][0]
+    entry[field] = value
+    with pytest.raises(ValidationError):
+        CascadeCase.model_validate(entry)
+
+
+def test_cascade_table_rejects_duplicate_ids(cascade_data):
+    cascade_data["cascades"].append(cascade_data["cascades"][0].copy())
+    with pytest.raises(ValidationError, match="IDs must be unique"):
+        CascadeTable.model_validate(cascade_data)
+
+
+def test_cascade_table_rejects_missing_source(cascade_data):
+    cascade_data["cascades"][0]["sources"] = ["unknown-reference"]
+    with pytest.raises(ValidationError, match="unknown source IDs"):
+        CascadeTable.model_validate(cascade_data)
+
+
+def test_cascade_rejects_previous_schema(cascade_data):
+    entry = cascade_data["cascades"][0]
+    entry["medicamento_causante"] = entry.pop("index_drug")
+    with pytest.raises(ValidationError):
+        CascadeCase.model_validate(entry)
