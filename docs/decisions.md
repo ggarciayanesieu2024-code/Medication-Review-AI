@@ -34,7 +34,7 @@ These rules are not negotiable and apply to every part of the system.
 | Patient data is **synthetic only**. | No real health data may enter the project, which avoids privacy and legal risks. |
 | **No secrets** in the repository. | API keys and credentials live in a local `.env` file (see `.env.example`), never in version control. |
 | Code, comments and docstrings are **in English**. | Keeps the codebase consistent and readable for any contributor. |
-| `src/ingesta.py` belongs to a teammate and **must not be modified without agreement**. | Avoids conflicts and respects ownership of that module. |
+| `src/Data/ingesta.py` belongs to a teammate and **must not be modified without agreement**. | Avoids conflicts and respects ownership of that module. |
 
 ---
 
@@ -74,7 +74,7 @@ These rules are not negotiable and apply to every part of the system.
 
 - **What:** Data structures (patients, medications, findings, citations, etc.)
   are validated with Pydantic.
-- **How:** Models are defined in `src/modelos.py`.
+- **How:** Models are defined alongside their owning components: report inputs in `src/Reports/informe.py`, source fragments and citations in `src/Rag/verificacion.py`, cascade tables in `src/Cascades/reglas.py`, and LLM responses in `src/llm.py`.
 - **Why:** Explicit, validated data models catch malformed input early and
   document the shape of the data in code.
 
@@ -132,7 +132,7 @@ These rules are not negotiable and apply to every part of the system.
 
 - **What:** The official list of medicines available for prescription in Spain.
 - **Where:** <http://listadomedicamentos.aemps.gob.es/prescripcion.zip>
-- **How:** Downloaded by `src/download_nomenclator.py`.
+- **How:** Downloaded by `src/Data/download_nomenclator.py`.
 - **Why:** It is the authoritative source of medicines, codes (including ATC)
   and identifiers needed to build synthetic patients and detect duplicates. to be verified after download
 
@@ -156,7 +156,7 @@ These rules are not negotiable and apply to every part of the system.
 - Virtual environment created.
 - Dependencies installed.
 - `groq` added to `requirements.txt`.
-- `src/download_nomenclator.py` written, but **not yet run successfully**.
+- `src/Data/download_nomenclator.py` written, but **not yet run successfully**.
 
 ---
 
