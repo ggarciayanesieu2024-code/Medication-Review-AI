@@ -25,7 +25,7 @@ def _load(path: Path) -> list[Patient]:
 
 DEV_PATIENTS = [
     p
-    for path in sorted(PATIENTS_DIR.glob("*.json")) + [DEMO_DIR / "pacientes_demo.json"]
+    for path in sorted(path for path in PATIENTS_DIR.glob("*.json") if path.name != "patient_scenarios.json") + [DEMO_DIR / "pacientes_demo.json"]
     for p in _load(path)
     if p.grupo == "desarrollo"
 ]
@@ -68,7 +68,7 @@ def test_sample_citations_point_to_a_medicine_of_that_patient():
 
 EVAL_RAW = [
     item
-    for path in sorted(PATIENTS_DIR.glob("*.json"))
+    for path in sorted(path for path in PATIENTS_DIR.glob("*.json") if path.name != "patient_scenarios.json")
     for item in (lambda d: d if isinstance(d, list) else [d])(json.loads(path.read_text(encoding="utf-8")))
     if item.get("grupo") == "evaluacion"
 ]

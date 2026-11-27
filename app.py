@@ -52,7 +52,7 @@ TYPE_LABELS = {
 
 def load_patients() -> tuple[list[tuple[Patient, str]], list[str]]:
     """Read Lucía's patient files and the demo patients, validated with Patient."""
-    files = [(path, "patients") for path in sorted(PATIENTS_DIR.glob("*.json"))]
+    files = [(path, "patients") for path in sorted(path for path in PATIENTS_DIR.glob("*.json") if path.name != "patient_scenarios.json")]
     if DEMO_PATIENTS_FILE.exists():
         files.append((DEMO_PATIENTS_FILE, "demo"))
 

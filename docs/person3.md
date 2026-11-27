@@ -69,13 +69,13 @@ Section 1A selects a prepared scenario or custom patient/question and displays t
 
 Section 2 uses `prepare_notebook_data()` to reuse validated nomenclator/sources, fetch missing medicine sections and rebuild the index if its contents differ. Existing covered sections are not automatically refreshed. `check_updates_since` reports changes since an explicit date; failure does not establish freshness. Sections 3-6 expose rule findings, retrieved/filtered fragments, exact prompts, checked answers, audit logs, incomplete checks and the complete report. The notebook imports production functions instead of test doubles or duplicate implementations.
 
-`src/Evaluation` contains:
+Evaluation files and patient scenarios:
 
 | File                          | Use                                                                                                                        |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `evaluation_questions.json` | 20 standalone RAG cases: 15 development and 5 reserved; questions, source labels, reference answers and manual criteria    |
 | `evaluar.py`                | `evaluate_cases()` runs retrieval-only or generated-answer batches and retains settings, fragments, outcomes and timings |
-| `patient_scenarios.json`    | 12 scenarios using A/B/C and E1-E6, including proposed medicine, clarification and added context; loaded in section 1A     |
+| `data/pacientes/patient_scenarios.json`    | 12 scenarios using A/B/C and E1-E6, including proposed medicine, clarification and added context; loaded in section 1A     |
 | `benchmark_manifest.json`   | Source/patient file fingerprints identifying the labelled snapshot; not automatically enforced by the notebook             |
 
 Section 7 evaluates **RAG**, using exact source Hit@k/Recall@k and optional generated-status/interaction matches. Missing labels remain unscored; errors and denominators must be reported. Reference answers, claim support and citation relevance require manual judgment. Cascades, duplicates, family warnings and grouping are inspected through patient scenarios, not scored by this batch evaluator. Automated regression tests are a separate layer.

@@ -74,7 +74,7 @@ class FakeModel:
 # ---------------------------------------------------------------- medicine list
 
 def _all_patient_medicines():
-    paths = sorted(PATIENTS_DIR.glob("*.json")) + [PROJECT_ROOT / "data" / "demo" / "pacientes_demo.json"]
+    paths = sorted(path for path in PATIENTS_DIR.glob("*.json") if path.name != "patient_scenarios.json") + [PROJECT_ROOT / "data" / "demo" / "pacientes_demo.json"]
     for path in paths:
         data = json.loads(path.read_text(encoding="utf-8"))
         for patient in data if isinstance(data, list) else [data]:

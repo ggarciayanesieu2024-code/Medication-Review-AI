@@ -49,10 +49,10 @@ Keep `.env` private. Paths and default model/retrieval settings are in `src/conf
 | `src/Rag/` | Indexing, filtered retrieval, prompts, answers and citation verification |
 | `src/Cascades/` | Ingredient duplicates, ATC-family warnings and prescribing-cascade hypotheses |
 | `src/Reports/` | Patient/finding models, report composition and HTML/PDF export |
-| `src/Evaluation/` | Batch RAG evaluator, labelled questions, patient scenarios and source manifest |
+| `src/Evaluation/` | Batch RAG evaluator, labelled questions and source manifest |
 | `data/raw/` / `data/processed/` | Downloaded responses / parsed nomenclator and CIMA sections |
 | `data/embeddings/` | Local Chroma index and cached E5 model |
-| `data/pacientes/` / `data/catalogo_medicamentos.json` | Synthetic patients / medicine selection catalogue |
+| `data/pacientes/` / `data/catalogo_medicamentos.json` | Synthetic patients and review scenarios / medicine selection catalogue |
 | `data/cascadas.json` | Curated cascade patterns and bibliography |
 | `tests/` / `docs/` | Automated regression tests / component and project documentation |
 
@@ -76,7 +76,7 @@ Run imports, choose a prepared scenario or custom patient/question in section 1A
 
 Section 2 reuses valid local data, downloads missing medicine sections and rebuilds the index when its stored contents differ. Optional update checks report changes without refreshing existing sections. This preparation can change source coverage. For manual data preparation, the existing modules can also be run from the root: `python -m src.Data.download_nomenclator`, `python -m src.Data.parse_nomenclator`, `python -m src.Data.parse_cima --help`, and `python -m src.Rag.indice`.
 
-Section 7 calls `src/Evaluation/evaluar.py` with `evaluation_questions.json`: 15 development and 5 reserved RAG cases. It scores expected source sections and optional answer-status/interaction labels; answer correctness and citation relevance still require inspection. `patient_scenarios.json` supplies 12 scenarios across 9 patients for manual workflow checks, including cascades and duplicates. `benchmark_manifest.json` records the source snapshot; the notebook does not automatically verify its hashes. Labels are source-checked drafts, and the reserved cases have already been inspected rather than kept completely blind.
+Section 7 calls `src/Evaluation/evaluar.py` with `evaluation_questions.json`: 15 development and 5 reserved RAG cases. It scores expected source sections and optional answer-status/interaction labels; answer correctness and citation relevance still require inspection. `data/pacientes/patient_scenarios.json` supplies 12 scenarios across 9 patients for manual workflow checks, including cascades and duplicates. `benchmark_manifest.json` records the source snapshot; the notebook does not automatically verify its hashes. Labels are source-checked drafts, and the reserved cases have already been inspected rather than kept completely blind.
 
 Run regression tests with `.venv\Scripts\python -m pytest -q`. Passing tests checks exercised behavior; it does not establish live retrieval quality or clinical correctness. Clear notebook outputs before sharing synthetic patient experiments.
 
