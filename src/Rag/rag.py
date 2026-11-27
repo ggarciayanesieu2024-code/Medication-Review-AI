@@ -26,11 +26,10 @@ import unicodedata
 from groq import GroqError
 from pydantic import ValidationError
 
-from src.busqueda import search_fragments
-from src.config import FORBIDDEN_PHRASES, K_RESULTS
-from src.llm import llm_medication_review
-from src.modelos import Fragment, StructuredOutputRAG
-from src.verificacion import verificar_cita
+from src.Rag.busqueda import search_fragments
+from src.config import FORBIDDEN_PHRASES, K_RESULTS, MIN_QUOTE_WORDS
+from src.llm import StructuredOutputRAG, llm_medication_review
+from src.Rag.verificacion import Fragment, verificar_cita
 
 # Shared grounding, safety, and response-format instructions.
 # Both task-specific prompts include these rules.
@@ -91,7 +90,7 @@ requested information was not found in the supplied fragments. Do not describe
 the medicine or combination as safe.
 
 The status describes evidence availability, not whether an interaction exists.
-""".strip()
+""".strip().replace("at least six words", f"at least {MIN_QUOTE_WORDS} words")
 
 
 # General questions may concern any of the indexed sections.
@@ -128,6 +127,14 @@ INTERACTION_SYSTEM_PROMPT = COMMON_RULES + """
 TASK: MEDICINE-PAIR INTERACTION REVIEW
 Assess what the supplied interaction sections say about the medicine and the
 other ingredient identified in the question.
+
+Include "interaction_detected" in the JSON response:
+- true: the supplied evidence describes a potential interaction for the pair.
+- false: the supplied evidence explicitly states no interaction under its
+  stated conditions. Preserve those conditions; this does not prove safety.
+- null: the requested interaction information was not found (status not_found).
+For status found, this field must be true or false. A missing mention is not
+evidence of no interaction and must not be labelled false.
 
 Use section 4.5 and its subsections as the evidence for this task.
 Check that the passage actually concerns the requested pair. A shared keyword
@@ -267,7 +274,7 @@ def prepare_interaction_search(
     )
 
 
-def run_prepared_request(prepared: dict) -> dict:
+def run_prepared_request(prepared: dict, *, generation_options: dict | None = None) -> dict:
     """Generate and check an answer from a request prepared by this module.
 
     Rejected answers are not returned. API failures remain separate from
@@ -288,7 +295,7 @@ def run_prepared_request(prepared: dict) -> dict:
             status="not_found",
             description="No se encontró información relevante en los fragmentos consultados.",
             citations=[],
-        ).model_dump()
+        ).model_dump(exclude_none=True)
         return result
 
     # Validate source shapes before paying for a generation request.
@@ -297,7 +304,7 @@ def run_prepared_request(prepared: dict) -> dict:
 
     for attempt in range(2):
         try:
-            response = llm_medication_review(messages)
+            response = llm_medication_review(messages, **(generation_options or {}))
             break
         except ValidationError:
             if attempt == 1:
@@ -346,7 +353,7 @@ def run_prepared_request(prepared: dict) -> dict:
             return result
 
     result["status"] = response.status
-    result["response"] = response.model_dump()
+    result["response"] = response.model_dump(exclude_none=True)
     if response.status == "not_found":
         result["reason"] = "insufficient_evidence"
     return result
@@ -357,16 +364,20 @@ def answer_question(
     nregistro: str | None = None,
     sections: list[str] | None = None,
     k: int = K_RESULTS,
+    *,
+    generation_options: dict | None = None,
 ) -> dict:
     """Retrieve evidence and return a checked answer to a general question."""
     prepared = prepare_general_search(question, nregistro, sections, k)
-    return run_prepared_request(prepared)
+    return run_prepared_request(prepared, generation_options=generation_options)
 
 
 def review_interaction(
     nregistro_x: str,
     ingredient_y: str,
     k: int = K_RESULTS,
+    *,
+    generation_options: dict | None = None,
 ) -> dict:
     """Review one medicine's interaction sections for another ingredient.
 
@@ -374,4 +385,96 @@ def review_interaction(
     call for the other medicine; patient-wide pair iteration is not done here.
     """
     prepared = prepare_interaction_search(nregistro_x, ingredient_y, k)
-    return run_prepared_request(prepared)
+    result = run_prepared_request(prepared, generation_options=generation_options)
+    if result["status"] == "found" and result["response"].get("interaction_detected") is None:
+        result.update(status="rejected", reason="invalid_response", response=None)
+    return result
+
+
+
+def answer_patient_question(
+    question: str,
+    search_question: str,
+    patient: dict,
+    medicine_ids: list[str],
+    findings: list[dict],
+    limitations: list[str],
+    *,
+    k: int = K_RESULTS,
+    generation_options: dict | None = None,
+) -> dict:
+    """Answer the original question using patient data and validated evidence.
+
+    Retrieval stays restricted to the resolved medicines. Rule and interaction
+    findings are supplied as evidence, never as a replacement for the patient
+    sheet. References are checked before an answer is released.
+    """
+    from src.llm import llm_answer_patient_question
+
+    result = {"status": "not_found", "response": None, "reason": "no_evidence"}
+    fragments = {}
+    for registration in dict.fromkeys(medicine_ids):
+        for fragment in search_fragments(search_question, nregistro=registration, k=k):
+            key = (fragment["nregistro"], fragment["seccion"], fragment["texto"])
+            fragments[key] = fragment
+    sources = [Fragment.model_validate(fragment) for fragment in fragments.values()]
+    evidence = [{**finding, "id": f"F{i}"} for i, finding in enumerate(findings, 1)]
+    if not sources and not evidence:
+        result["response"] = {
+            "status": "not_found",
+            "answer": "No supporting information was found in the available sources. This does not establish safety.",
+            "citations": [], "finding_ids": [],
+        }
+        return result
+
+    grounding = COMMON_RULES.split("RESPONSE FORMAT")[0].replace(
+        "Use only the supplied fragments.", "Use only the supplied patient facts, fragments and checked findings."
+    ).replace(
+        "Support every factual finding with quotations from the supplied fragments.",
+        "Support CIMA statements with quotations and rule statements with supplied finding IDs.",
+    )
+    instructions = grounding + """
+TASK: ANSWER THE DOCTOR'S QUESTION ABOUT THE SUPPLIED PATIENT
+Answer the original question directly, in its language. Use only the supplied
+patient facts, CIMA fragments and checked findings. Do not assume missing
+allergies, diagnoses, laboratory values or prescription dates. Describe any
+limits that affect the answer. Never give permission to prescribe or recommend
+starting, stopping or adjusting treatment. Cascade matches are hypotheses.
+The medicine-pair review may have no evidence or incomplete checks; neither
+establishes safety. Focus on the question instead of repeating the whole review.
+Return JSON: status (found or not_found), answer (concise text), citations
+(list of nregistro, seccion, literal_quote), finding_ids (list of supplied F IDs).
+Every factual conclusion must be supported by an exact CIMA quotation or a
+supplied finding. Use finding_ids for rule/cascade results and their references;
+use citations for direct CIMA evidence. Do not invent references. When relying
+on a cascade, identify it as a hypothesis and retain its qualifications.
+Do not write F IDs in the answer prose; supporting checks will be displayed.
+If evidence is insufficient, explain what cannot be answered and set status
+not_found, citations [] and finding_ids [].
+"""
+    messages = [
+        {"role": "system", "content": instructions},
+        {"role": "user", "content": json.dumps({
+            "question": question, "patient": patient,
+            "fragments": [source.model_dump() for source in sources],
+            "findings": evidence, "limitations": limitations,
+        }, ensure_ascii=False)},
+    ]
+    try:
+        answer = llm_answer_patient_question(messages, **(generation_options or {}))
+    except (ValidationError, ValueError):
+        return {"status": "rejected", "response": None, "reason": "invalid_response"}
+    except (GroqError, RuntimeError):
+        return {"status": "error", "response": None, "reason": "generation_failed"}
+
+    texts = [answer.answer] + [citation.literal_quote for citation in answer.citations]
+    if any(normalise_text(phrase) in normalise_text(text)
+           for text in texts for phrase in FORBIDDEN_PHRASES):
+        return {"status": "rejected", "response": None, "reason": "forbidden_phrase"}
+    if any(not any(verificar_cita(citation, source) for source in sources)
+           for citation in answer.citations):
+        return {"status": "rejected", "response": None, "reason": "invalid_citation"}
+    if set(answer.finding_ids) - {finding["id"] for finding in evidence}:
+        return {"status": "rejected", "response": None, "reason": "invalid_citation"}
+    return {"status": answer.status, "response": answer.model_dump(),
+            "reason": None if answer.status == "found" else "insufficient_evidence"}

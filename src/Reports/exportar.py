@@ -15,7 +15,7 @@ import html
 import io
 from xml.sax.saxutils import escape as xml_escape
 
-from src.informe import FOOTER, Report
+from src.Reports.informe import FOOTER, Report
 
 # --------------------------------------------------------------------------
 # HTML

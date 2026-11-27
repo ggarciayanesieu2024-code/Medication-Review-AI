@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "created_on": "2026-11-27",
+  "label_status": "AI source-checked draft; not clinically validated",
+  "fragments": 99,
+  "registrations": 18,
+  "rag_cases": {
+    "development": 15,
+    "evaluation": 5
+  },
+  "patient_scenarios": 12,
+  "sha256": {
+    "data/processed/fragmentos_cima.json": "0a3fef99cdbb8c2882f6065cf5213e196c778731540b24f2dc6c9077a1355768",
+    "data/processed/prescriptions.json": "4b79e96fb0f84a66783564cd4929262a90ed12a6d09e7022ba58397e30825678",
+    "data/catalogo_medicamentos.json": "86b6cb48715aca35d8cd7d361636f69400579b0d9e20300136c3cac7f0356a64",
+    "data/cascadas.json": "73acd12c93c401d6dcf4422ccbe1fdec0fa7876975d4f8104927c05077bb0c53",
+    "data/pacientes/paciente_A.json": "32b86be4d0e40051bb8827bfec1ff54b6c50133855519784b27de123a9997554",
+    "data/pacientes/paciente_B.json": "9d097398a21d634261bb64b73835eeaa72e9a2da47e85835d8fb6537b8f63ef2",
+    "data/pacientes/paciente_C.json": "68e831e7b30fddf18b9cdce6437b4b190f162806407b9fea9629c9d6a2a1264f",
+    "data/pacientes/paciente_E1.json": "0bba047c5b0acefa930492dcd2c6ace934dc2c5b4f8fd723f1321ee4a4077d3d",
+    "data/pacientes/paciente_E2.json": "968ef5bb0faa5cd64ec87d011988bee751b911ec9d0da925bf739cfa381aad7c",
+    "data/pacientes/paciente_E3.json": "035d7328d6343d24ab3a2bed078f5567a79b107a98c7213f68eebeac1ddbe5a5",
+    "data/pacientes/paciente_E4.json": "f848a9958d9e719607d82e756ea16ac921d2d3d4c0ab2d1f1f0d47fbdf106e9d",
+    "data/pacientes/paciente_E5.json": "2b84bb96b3d56232d2239fae005d7c7d3a3495b5625f7ff477b45e7101a72c0b",
+    "data/pacientes/paciente_E6.json": "0a4b752457066fb7f9c5c3d736bf24a383d72942f436fad3186f5c839a9b4478"
+  },
+  "revision_note": "Renamed distinct EVAL_P4 patient to E6 and unified its expected-result structure; nine distinct patients and twelve scenarios."
+}

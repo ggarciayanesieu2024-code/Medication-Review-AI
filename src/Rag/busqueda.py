@@ -20,7 +20,7 @@ This script retrieves evidence. It does not generate answers or establish
 whether a combination is safe.
 
 Run from the project root:
-    python -m src.busqueda
+    python -m src.Rag.busqueda
 """
 
 from functools import lru_cache
@@ -44,7 +44,7 @@ from src.config import (
 def load_search_resources():
     """Load the database collection and E5 once per Python process."""
     if not DATABASE_DIR.exists():
-        raise FileNotFoundError("Database folder missing. Run src/indice.py first.")
+        raise FileNotFoundError("Database folder missing. Run python -m src.Rag.indice first.")
 
     client = chromadb.PersistentClient(path=str(DATABASE_DIR))
     collection = client.get_collection(
@@ -122,8 +122,6 @@ def search_fragments(
         n_results=min(k, len(eligible_ids)),
         include=["documents", "metadatas", "distances"],
     )
-
-# FOR FUTURE: I believe we talked about using a more complicated ranking function.
 
     # 5. Return one dictionary per result.
     # Chroma groups results by query; [0] selects our single query.

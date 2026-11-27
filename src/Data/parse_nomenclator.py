@@ -17,15 +17,12 @@ Searching for the plain name "des_nomco" would find nothing. The helper
 functions below build the full name for us.
 
 Run from the project root:
-    python src/parse_nomenclator.py
+    python -m src.Data.parse_nomenclator
 """
 
 import json
 import xml.etree.ElementTree as ET
-if __package__:
-    from src.config import NOMENCLATOR_XML_FILE, PRESCRIPTIONS_FILE
-else:
-    from config import NOMENCLATOR_XML_FILE, PRESCRIPTIONS_FILE
+from src.config import NOMENCLATOR_XML_FILE, PRESCRIPTIONS_FILE
 
 
 # Namespace declared at the top of Prescripcion.xml.

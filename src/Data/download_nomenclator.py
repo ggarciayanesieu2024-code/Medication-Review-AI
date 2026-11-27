@@ -15,7 +15,7 @@ Why this comes first:
 - Once downloaded, the project works without internet access, which protects the demo.
 
 Run from the project root:
-    python src/download_nomenclator.py
+    python -m src.Data.download_nomenclator
 """
 
 import zipfile

@@ -1,4 +1,3 @@
-"""Placeholder for deterministic medication-review rules."""
 """Deterministic rules: duplicates, same-family warnings and prescribing cascades.
 
 No AI is used here. These checks work on structured codes (ATC and active
@@ -15,19 +14,67 @@ import json
 from dataclasses import dataclass, field
 from itertools import combinations
 from pathlib import Path
+from typing import Annotated
+
+from pydantic import BaseModel, Field, StringConstraints, model_validator
+
+from src.config import CASCADES_FILE, PRESCRIPTIONS_FILE
 
 # Number of ATC characters that define a chemical subgroup (e.g. "N02BE").
 ATC_FAMILY_LENGTH = 5
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_CASCADES_PATH = PROJECT_ROOT / "data" / "cascadas.json"
-# Output of src/parse_nomenclator.py (same path as PRESCRIPTIONS_FILE in config).
-DEFAULT_PRESCRIPTIONS_PATH = PROJECT_ROOT / "data" / "processed" / "prescriptions.json"
+DEFAULT_CASCADES_PATH = CASCADES_FILE
+# Output of src/Data/parse_nomenclator.py (same path as PRESCRIPTIONS_FILE in config).
+DEFAULT_PRESCRIPTIONS_PATH = PRESCRIPTIONS_FILE
 
 
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
+
+CascadeText = Annotated[str, StringConstraints(min_length=1, pattern=r"\S")]
+CascadeCode = Annotated[str, StringConstraints(min_length=1, pattern=r"^\S+$")]
+
+
+class CascadeCase(BaseModel):
+    """One ATC-based hypothesis, with source IDs from CascadeTable.sources."""
+
+    model_config = {"extra": "forbid"}
+
+    id: str = Field(pattern=r"^C\d{2}$")
+    index_drug: CascadeText
+    index_atc: list[CascadeCode] = Field(min_length=1)
+    adverse_effect: CascadeText
+    cascade_drug: CascadeText
+    cascade_atc: list[CascadeCode] = Field(min_length=1)
+    exclude_atc: list[CascadeCode] = Field(default_factory=list)
+    sources: list[CascadeCode] = Field(min_length=1)
+    question: CascadeText
+    note: CascadeText | None = None
+
+
+class CascadeTable(BaseModel):
+    """The complete cascade file and shared bibliography.
+
+    Validation checks structure and references, not clinical correctness.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    sources: dict[CascadeCode, CascadeText] = Field(min_length=1)
+    cascades: list[CascadeCase] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_references(self):
+        ids = [cascade.id for cascade in self.cascades]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Cascade IDs must be unique.")
+        for cascade in self.cascades:
+            missing = set(cascade.sources) - self.sources.keys()
+            if missing:
+                raise ValueError(f"{cascade.id}: unknown source IDs: {', '.join(sorted(missing))}")
+        return self
+
 
 @dataclass
 class Medication:
@@ -79,15 +126,16 @@ class CascadeHypothesis:
 # ---------------------------------------------------------------------------
 
 def load_cascades(path: Path = DEFAULT_CASCADES_PATH) -> dict:
-    """Load the hand-curated cascade table ({"sources": ..., "cascades": [...]})."""
+    """Validate the cascade file and keep the dictionary interface used by rules."""
     with open(path, encoding="utf-8") as f:
-        return json.load(f)
+        table = CascadeTable.model_validate(json.load(f))
+    return table.model_dump(exclude_unset=True)
 
 
 def load_drug_info(path: Path = DEFAULT_PRESCRIPTIONS_PATH) -> dict[str, dict]:
     """Build the code lookup used by the rules from the parsed nomenclator.
 
-    Reads the file written by src/parse_nomenclator.py and returns a dictionary
+    Reads the file written by src/Data/parse_nomenclator.py and returns a dictionary
     that maps each nregistro (nro_definitivo) to:
         {"atc": [cod_atc, ...], "active_ingredients": [cod_principio_activo, ...]}
 

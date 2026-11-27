@@ -25,8 +25,8 @@ Raw responses are only saved, unmodified, to data/raw/cima/ when --guardar-raw
 is given. By default nothing is written there.
 
 Run from the project root:
-    python src/parse_cima.py 66337 77758
-    python src/parse_cima.py 66337 77758 --guardar-raw
+    python -m src.Data.parse_cima 66337 77758
+    python -m src.Data.parse_cima 66337 77758 --guardar-raw
 """
 
 import argparse
@@ -42,10 +42,7 @@ import urllib.request
 from pathlib import Path
 
 
-if __package__:
-    from src.config import CIMA_RAW_DIR, FRAGMENTS_FILE
-else:
-    from config import CIMA_RAW_DIR, FRAGMENTS_FILE
+from src.config import CIMA_RAW_DIR, FRAGMENTS_FILE
 
 
 # Settings used only when downloading and parsing CIMA sections.

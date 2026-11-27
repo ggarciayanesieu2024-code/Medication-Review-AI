@@ -1,8 +1,26 @@
 
 """Verify AI citations against official CIMA document fragments."""
 
-from src.modelos import Citation, Fragment
+from pydantic import BaseModel, Field
 from src.config import MIN_QUOTE_WORDS
+
+
+class Fragment(BaseModel):
+    """One text fragment from an official CIMA technical-sheet section."""
+
+    nregistro: str = Field(min_length=1)
+    nombre: str | None = None
+    seccion: str = Field(min_length=1)
+    titulo: str | None = None
+    texto: str = Field(min_length=1)
+
+
+class Citation(BaseModel):
+    """An exact quotation linked to a CIMA medicine and section."""
+
+    nregistro: str = Field(min_length=1)
+    seccion: str = Field(min_length=1)
+    literal_quote: str = Field(min_length=1)
 
 
 def normalize_text(text: str) -> str:
