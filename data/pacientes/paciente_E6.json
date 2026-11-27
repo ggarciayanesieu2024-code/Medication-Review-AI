@@ -1,5 +1,5 @@
 {
-  "id": "EVAL_P4",
+  "id": "E6",
   "edad": 76,
   "grupo": "evaluacion",
   "medicamentos": [
@@ -34,13 +34,22 @@
       "prescriptor": "Dra. Torres (Atención Primaria)"
     }
   ],
-  "resultado_esperado": {
+  "expected_result": {
     "total_medicamentos": 5,
     "total_prescriptores": 3,
     "agrupacion_por_prescriptor": {
-      "Dr. Romero (Cardiología)": ["69534", "67729"],
-      "Dra. Vega (Endocrinología)": ["77044", "76578"],
-      "Dra. Torres (Atención Primaria)": ["66602"]
+      "Dr. Romero (Cardiología)": [
+        "69534",
+        "67729"
+      ],
+      "Dra. Vega (Endocrinología)": [
+        "77044",
+        "76578"
+      ],
+      "Dra. Torres (Atención Primaria)": [
+        "66602"
+      ]
     }
-  }
+  },
+  "hypothesis": "The system must preserve the five medicines and group them under the three prescribers specified in expected_result. In the frozen benchmark snapshot, none of these registrations has local CIMA sections: report incomplete interaction coverage without concluding that the treatment is safe or substituting other brands."
 }

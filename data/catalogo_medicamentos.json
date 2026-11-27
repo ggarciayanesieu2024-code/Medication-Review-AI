@@ -1,5 +1,5 @@
 {
-  "_nota": "Medicines the screen can use (Person 5). 'principios_activos' are the active-ingredient names, in Spanish, that the interaction search looks for in the other medicine's technical sheet (case and accents are ignored). 'ficha' is true when the shared CIMA file (fragmentos_cima_2026-11-10_v3.json) has this medicine's technical sheet, so the model can search it. Only medicines with 'ficha' true can be chosen as a new medicine. Ingredient names were written from the medicine names; check them against the nomenclator. Registration 87970 is in the CIMA file but not in any patient file yet, so it still needs to be added.",
+  "_nota": "Medicines the screen can use (Person 5). 'principios_activos' are the active-ingredient names in Spanish used to search other medicines' technical sheets. 'ficha' is true when data/processed/fragmentos_cima.json contains this registration's sheet. Medicines without a local sheet can still be selected; only available sheets are searched. The catalogue includes all patient medicines and all registrations present in the shared CIMA fragments. Ingredient names should be checked against the nomenclator.",
   "medicamentos": [
     {"nregistro": "55211", "nombre": "Dianben 850 mg comprimidos", "principios_activos": ["metformina"], "ficha": true},
     {"nregistro": "59718", "nombre": "Besitran 100 mg comprimidos recubiertos con película", "principios_activos": ["sertralina"], "ficha": true},
@@ -9,19 +9,20 @@
     {"nregistro": "65222", "nombre": "Amoxicilina/Ácido clavulánico Tevagen 500/125 mg comprimidos", "principios_activos": ["amoxicilina", "ácido clavulánico"], "ficha": true},
     {"nregistro": "65461", "nombre": "Amlodipino Cinfa 10 mg comprimidos EFG", "principios_activos": ["amlodipino"], "ficha": true},
     {"nregistro": "65879", "nombre": "Simvastatina Pensa 10 mg comprimidos", "principios_activos": ["simvastatina"], "ficha": true},
-    {"nregistro": "66602", "nombre": "OMEPRAZOL VIR 40 mg CAPSULAS DURAS GASTRORRESISTENTES", "principios_activos": ["omeprazol"], "ficha": true},
-    {"nregistro": "67729", "nombre": "LOSARTAN CINFA 50 mg COMPRIMIDOS RECUBIERTOS CON PELICULA EFG", "principios_activos": ["losartán"], "ficha": true},
+    {"nregistro": "66602", "nombre": "OMEPRAZOL VIR 40 mg CAPSULAS DURAS GASTRORRESISTENTES", "principios_activos": ["omeprazol"], "ficha": false},
+    {"nregistro": "67729", "nombre": "LOSARTAN CINFA 50 mg COMPRIMIDOS RECUBIERTOS CON PELICULA EFG", "principios_activos": ["losartán"], "ficha": false},
     {"nregistro": "68339", "nombre": "Paracetamol Kern Pharma 1 g comprimidos EFG", "principios_activos": ["paracetamol"], "ficha": true},
-    {"nregistro": "69534", "nombre": "ATORVASTATINA CINFA 10 mg COMPRIMIDOS RECUBIERTOS CON PELICULA EFG", "principios_activos": ["atorvastatina"], "ficha": true},
+    {"nregistro": "69534", "nombre": "ATORVASTATINA CINFA 10 mg COMPRIMIDOS RECUBIERTOS CON PELICULA EFG", "principios_activos": ["atorvastatina"], "ficha": false},
     {"nregistro": "74483", "nombre": "Normogastrol 20 mg comprimidos gastrorresistentes", "principios_activos": ["pantoprazol"], "ficha": true},
-    {"nregistro": "76578", "nombre": "METFORMINA AENOVA 1000 MG COMPRIMIDOS RECUBIERTOS CON PELICULA EFG", "principios_activos": ["metformina"], "ficha": true},
-    {"nregistro": "77044", "nombre": "LEVOTIROXINA SODICA TEVA 75 microgramos COMPRIMIDOS EFG", "principios_activos": ["levotiroxina"], "ficha": true},
+    {"nregistro": "76578", "nombre": "METFORMINA AENOVA 1000 MG COMPRIMIDOS RECUBIERTOS CON PELICULA EFG", "principios_activos": ["metformina"], "ficha": false},
+    {"nregistro": "77044", "nombre": "LEVOTIROXINA SODICA TEVA 75 microgramos COMPRIMIDOS EFG", "principios_activos": ["levotiroxina"], "ficha": false},
     {"nregistro": "85780", "nombre": "Antidol 1 g comprimidos", "principios_activos": ["paracetamol"], "ficha": true},
     {"nregistro": "88372", "nombre": "Ibudol 400 mg cápsulas blandas", "principios_activos": ["ibuprofeno"], "ficha": true},
-    {"nregistro": "07383002", "nombre": "Januvia 25 mg comprimidos", "principios_activos": ["sitagliptina"], "ficha": false},
-    {"nregistro": "66327", "nombre": "Geloprofen 400 mg comprimidos recubiertos con película", "principios_activos": ["ibuprofeno"], "ficha": false},
-    {"nregistro": "71622", "nombre": "Clopidogrel Cinfamed 75 mg comprimidos", "principios_activos": ["clopidogrel"], "ficha": false},
-    {"nregistro": "73561", "nombre": "Combiprasal 0,5/2,5 mg solución para nebulizador", "principios_activos": ["ipratropio", "salbutamol"], "ficha": false},
-    {"nregistro": "80733", "nombre": "Atorvastatina Stada 80 mg comprimidos", "principios_activos": ["atorvastatina"], "ficha": false}
+    {"nregistro": "07383002", "nombre": "Januvia 25 mg comprimidos", "principios_activos": ["sitagliptina"], "ficha": true},
+    {"nregistro": "66327", "nombre": "Geloprofen 400 mg comprimidos recubiertos con película", "principios_activos": ["ibuprofeno"], "ficha": true},
+    {"nregistro": "71622", "nombre": "Clopidogrel Cinfamed 75 mg comprimidos", "principios_activos": ["clopidogrel"], "ficha": true},
+    {"nregistro": "73561", "nombre": "Combiprasal 0,5/2,5 mg solución para nebulizador", "principios_activos": ["ipratropio", "salbutamol"], "ficha": true},
+    {"nregistro": "80733", "nombre": "Atorvastatina Stada 80 mg comprimidos", "principios_activos": ["atorvastatina"], "ficha": true},
+    {"nregistro": "87970", "nombre": "LOPERAMIDA AUROVITAS 2 MG CAPSULAS DURAS", "principios_activos": ["loperamida"], "ficha": true}
   ]
 }
