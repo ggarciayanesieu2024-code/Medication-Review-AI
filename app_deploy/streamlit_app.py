@@ -1,9 +1,7 @@
 """Entry point for the hosted demo on Streamlit Community Cloud (Person 5).
 
-Community Cloud installs the packages listed next to the entry point
-(deploy/requirements.txt) instead of the full project requirements. The screen
-with sample findings only needs those few packages. When the app is connected
-to the real rules and RAG pipeline, add their packages to deploy/requirements.txt.
+Community Cloud uses the full requirements.txt at the repository root.
+This wrapper runs the same app.py used locally.
 
 Locally, keep using:  streamlit run app.py
 """

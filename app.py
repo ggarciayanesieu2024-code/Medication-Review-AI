@@ -1,4 +1,4 @@
-"""Streamlit interface for the medication review (Person 5).
+"""Streamlit interface for patient reviews and evidence-grounded questions.
 
 Run from the project root:
 
@@ -6,12 +6,13 @@ Run from the project root:
 
 Two tabs:
 
-* Review current medicines - checks every medicine the patient already takes.
+* Review current medicines - accepts a patient JSON sheet and optional question.
+  Without a question, checks every medicine the patient already takes.
 * Check a new medicine - checks a medicine the prescriber is considering,
   against the patient's current medicines, before it is prescribed.
 
-Both use the real system when it is available (see src/revision.py):
-Person 2's rules need data/processed/prescriptions.json; Person 3's model needs
+Both use the real system when it is available (see src/main.py):
+The rules need data/processed/prescriptions.json; the model needs
 the full requirements, the search index and GROQ_API_KEY. The report always
 says which checks did not run. When neither part is available, the review tab
 shows SAMPLE findings (data/demo/hallazgos_ejemplo.json) under a "Sample data"
@@ -25,15 +26,15 @@ import streamlit as st
 from pydantic import ValidationError
 
 from src.config import PATIENTS_DIR, PROJECT_ROOT
-from src.informe import generate_report, save_report
-from src.modelos import Medication, Patient
-from src.revision import (
+from src.Reports.informe import generate_report, save_report
+from src.Reports.informe import Medication, Patient
+from src.main import (
     check_new_medicine,
     load_catalogue,
     load_rule_data,
     model_status,
     planned_questions,
-    review_patient,
+    review_request,
     rules_status,
 )
 
@@ -154,8 +155,8 @@ live = rules_ready or model_ready
 with st.sidebar:
     st.subheader("How it works")
     st.markdown(
-        "1. Choose a patient.\n"
-        "2. **Review current medicines**, or **check a new medicine** before prescribing it.\n"
+        "1. Choose a patient or upload a patient JSON file.\n"
+        "2. Ask an optional question, run a standard review, or check a new medicine.\n"
         "3. Read the report, or download it as a PDF or a web page.\n\n"
         "Each report is also saved in the `output/` folder."
     )
@@ -175,15 +176,19 @@ with st.sidebar:
     else:
         st.info(f"Model: not available. Reason: {model_message}")
     if not live:
-        st.warning("**Review current medicines** shows sample findings until the rules or the "
-                   "model are available. They are placeholders, not clinical information.")
+        st.warning("Example patients use sample findings when the system is unavailable. "
+                   "Uploaded patients use the available ingredient-name checks.")
     st.caption("Synthetic patients only.")
     for problem in problems:
         st.error(problem)
 
 visible = [(p, s) for p, s in patients if show_evaluation or p.grupo != "evaluacion"]
 visible.sort(key=lambda ps: (ps[0].grupo == "evaluacion", ps[1] == "demo", ps[0].id))
-if not visible:
+uploaded_patient = st.sidebar.file_uploader(
+    "Patient sheet (JSON)", type=["json"],
+    help="Upload one patient with id, edad, grupo and medicamentos. Each medicine needs nregistro, nombre, dosis and prescriptor. Optional contexto_clinico adds relevant clinical history.",
+)
+if not visible and uploaded_patient is None:
     st.error("No patient files found in data/pacientes.")
     st.stop()
 
@@ -197,8 +202,19 @@ def patient_label(pid: str) -> str:
     return f"Patient {p.id} · {p.edad} years · {len(p.medicamentos)} medicines{extra}"
 
 
-patient_id = st.selectbox("Patient", list(by_id), format_func=patient_label)
-patient, _ = by_id[patient_id]
+if uploaded_patient is not None:
+    try:
+        patient = Patient.model_validate_json(uploaded_patient.getvalue())
+    except ValidationError as exc:
+        st.error("The uploaded patient JSON does not match the required format.")
+        st.json(exc.errors(include_url=False, include_input=False))
+        st.stop()
+    patient_id = patient.id
+    st.write(f"**Uploaded patient {patient.id} · {patient.edad} years**")
+else:
+    patient_id = st.selectbox("Patient", list(by_id), format_func=patient_label, key="patient_id")
+    patient, _ = by_id[patient_id]
+patient_snapshot = patient.model_dump_json()
 
 prescribers = {m.prescriptor for m in patient.medicamentos}
 st.write(f"**{len(patient.medicamentos)} medicines** from **{len(prescribers)} prescribers**")
@@ -217,31 +233,58 @@ tab_review, tab_check = st.tabs(["Review current medicines", "Check a new medici
 # Tab 1: review the current medicines
 # --------------------------------------------------------------------------
 with tab_review:
+    question = st.text_area(
+        "Question about this patient (optional)", key="question",
+        placeholder="For example: What should be reviewed if I add Ibudol 400 mg?",
+        help="Leave empty for the standard review. A question uses the patient sheet, medicine rules and CIMA evidence.",
+        max_chars=4000,
+    ).strip()
     if live:
         st.caption(what_runs(rules_ready, model_ready))
         if model_ready:
-            n = planned_questions(patient, None, catalogue)
-            st.caption(f"The model will be asked {n} question(s) for this patient, "
-                       "so it can take a minute.")
+            if question:
+                st.caption("The question will be interpreted, checked against the patient sheet, "
+                           "and answered from the available evidence. This can take a minute.")
+            else:
+                n = planned_questions(patient, None, catalogue)
+                st.caption(f"The model will be asked {n} question(s) for this patient, "
+                           "so it can take a minute.")
     else:
         note = load_sample_findings().get(patient.id, {}).get("nota")
         if note:
             st.caption(f"Sample: {note}")
 
-    if st.button("Review", type="primary", key="review"):
+    if st.button("Answer question" if question else "Review", type="primary", key="review"):
         bar = None
+        st.session_state.pop("clarification", None)
         try:
-            if live:
+            if live or question or uploaded_patient is not None:
                 bar, update = progress_bar()
-                checked = review_patient(
-                    patient, catalogue, rule_data=rule_data, use_model=model_ready, progress=update,
+                request = review_request(
+                    patient, catalogue, question, rule_data=rule_data,
+                    use_model=model_ready, progress=update,
                 )
+                if request.clarification:
+                    st.session_state.pop("result", None)
+                    st.session_state["clarification"] = {
+                        "patient": patient_snapshot, "question": question,
+                        "text": request.clarification,
+                    }
+                    st.warning(request.clarification)
+                    st.stop()
+                st.session_state.pop("clarification", None)
+                checked = request.checks
                 report = generate_report(
                     patient,
                     checked.findings,
                     checked_without_evidence=checked.checked_without_evidence,
                     could_not_check=checked.could_not_check,
                     unchecked_types=checked.unchecked,
+                    proposed=request.proposed,
+                    question=request.question,
+                    answer=request.answer,
+                    answer_citations=request.citations,
+                    supporting_findings=request.supporting_findings,
                 )
             else:
                 entry = load_sample_findings().get(patient.id, {})
@@ -251,6 +294,7 @@ with tab_review:
                 )
             st.session_state["result"] = {
                 "patient_id": patient.id, "report": report, "files": saved_files(report),
+                "patient": patient_snapshot, "question": question,
             }
         except Exception as exc:  # show the problem on screen, not a stack trace
             st.session_state.pop("result", None)
@@ -259,8 +303,11 @@ with tab_review:
             if bar is not None:
                 bar.empty()
 
+    clarification = st.session_state.get("clarification")
+    if clarification and clarification["patient"] == patient_snapshot and clarification["question"] == question:
+        st.warning(clarification["text"])
     result = st.session_state.get("result")
-    if result and result["patient_id"] == patient.id:
+    if result and result.get("patient") == patient_snapshot and result.get("question") == question:
         show_counts(result["report"], list(TYPE_LABELS.items()))
         show_report(result["report"], result["files"], key="review")
     else:
@@ -278,6 +325,7 @@ with tab_check:
     choices = sorted(catalogue.values(), key=lambda e: e.nombre.casefold())
     nregistro = st.selectbox(
         "Medicine to prescribe",
+        key="proposed_medicine",
         options=[e.nregistro for e in choices],
         format_func=lambda n: catalogue[n].nombre + ("" if catalogue[n].ficha
                                                      else "  (technical sheet not in the system)"),
@@ -317,6 +365,7 @@ with tab_check:
                 )
                 st.session_state["check_result"] = {
                     "patient_id": patient.id, "report": report,
+                    "patient": patient_snapshot,
                     "files": saved_files(report), "log": checked.log,
                 }
             except Exception as exc:  # show the problem on screen, not a stack trace
@@ -326,7 +375,7 @@ with tab_check:
                 bar.empty()
 
     checked_result = st.session_state.get("check_result")
-    if checked_result and checked_result["patient_id"] == patient.id:
+    if checked_result and checked_result.get("patient") == patient_snapshot:
         show_counts(checked_result["report"], [
             ("duplicado", "Same ingredient"),
             ("interaccion", "Interactions found"),
