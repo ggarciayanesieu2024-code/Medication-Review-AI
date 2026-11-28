@@ -75,6 +75,7 @@ REASON_TEXT = {
     "invalid_citation": "the model's answer quoted text that could not be verified",
     "invalid_response": "the model's answer was not in the expected format",
     "generation_failed": "the model could not be reached",
+    "context_too_large": "the evidence exceeds the model request-size limit",
 }
 
 Progress = Callable[[int, int, str], None]
@@ -143,6 +144,12 @@ def model_status(database_dir: Path = DATABASE_DIR) -> tuple[bool, str]:
             f"the model's libraries are not installed here ({exc.name}). "
             "Install the full requirements.txt."
         )
+    from importlib.util import find_spec
+
+    for package in ("chromadb", "sentence_transformers", "torch"):
+        if find_spec(package) is None:
+            return False, f"Required package missing: {package}."
+
     if not Path(database_dir).exists():
         return False, (
             "the search index is missing. Put the shared CIMA file in data/processed/ "
@@ -352,7 +359,7 @@ def review_request(
             if f"F{i}" in response["finding_ids"]
         ]
     else:
-        reason = REASON_TEXT.get(answer["reason"], "the answer could not be verified")
+        reason = REASON_TEXT.get(answer["reason"], "the answer could not be verified",)
         result.answer = f"The question could not be answered: {reason}. See the available checks below."
         result.checks.could_not_check.append(f"Question answer: {reason}.")
     if progress:
@@ -511,6 +518,17 @@ def _interaction_plan(
                 if note not in result.could_not_check:
                     result.could_not_check.append(note)
             continue
+        # Identical single-ingredient medicines are handled
+        # by duplicate detection, not drug-pair interaction checks.
+        ingredients_x = {
+            ing.strip().casefold() for ing in ex.principios_activos
+        }
+        ingredients_y = {
+            ing.strip().casefold() for ing in ey.principios_activos
+        }
+
+        if len(ingredients_x) == 1 and ingredients_x == ingredients_y:
+            continue
         # Duplicate detection and evidence retrieval are separate checks.
         # Shared ingredients must not hide interactions in combination products.
         if ex.ficha:
@@ -536,13 +554,22 @@ def _ask_model(
     progress: Progress | None,
 ) -> None:
     """Convert RAG outcomes to report results without reinterpreting evidence."""
+    request_cache = {}
     total = len(plan)
     for done, (sheet, ingredient, x, y) in enumerate(plan):
         label = f"{sheet.nombre} sheet, searched for {ingredient}"
         if progress:
             progress(done, total, f"Searching the {sheet.nombre} sheet for {ingredient}")
         try:
-            answer = review(sheet.nregistro, ingredient)
+            cache_key = (sheet.nregistro, ingredient)
+
+            if cache_key in request_cache:
+                answer = request_cache[cache_key]
+            else:
+                answer = review(sheet.nregistro, ingredient)
+
+                if answer.get("status") in {"found", "not_found"}:
+                    request_cache[cache_key] = answer
         except Exception as exc:  # index or search failure: never "nothing found"
             result.log.append({"sheet": sheet.nregistro, "ingredient": ingredient,
                                "status": "exception", "reason": type(exc).__name__})

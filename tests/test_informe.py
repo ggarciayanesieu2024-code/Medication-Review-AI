@@ -139,7 +139,7 @@ def test_interaction_shows_medicine_name_and_section():
 
 def test_pairs_without_information_are_not_called_safe():
     md = _report(BY_ID["C"]).markdown
-    assert "Pairs checked with no information found" in md
+    assert "Directional evidence checks with no information found" in md
     assert "does not mean the combination is safe" in md
 
 

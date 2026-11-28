@@ -31,7 +31,7 @@ MODEL_CACHE_DIR = EMBEDDINGS_DIR / "E5_model"
 
 
 # Language model configuration.
-GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 TEMPERATURE = 0.0
 MAX_TOKENS = 4096
 TOP_P = 1.0
@@ -49,7 +49,7 @@ DISTANCE_METRIC = "cosine"
 
 
 # RAG search configuration.
-K_RESULTS = 3
+K_RESULTS = 5
 COLLECTION_NAME = "cima_fragments"
 MIN_QUOTE_WORDS = 6
 

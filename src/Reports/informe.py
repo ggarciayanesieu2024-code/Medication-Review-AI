@@ -143,6 +143,15 @@ def find_forbidden_phrases(text: str) -> list[str]:
 # Report structure
 # --------------------------------------------------------------------------
 
+def cima_source_url(nregistro: str) -> str:
+    if not re.fullmatch(r"[0-9]+", str(nregistro)):
+        return ""
+    return (
+        "https://cima.aemps.es/cima/dochtml/ft/"
+        f"{nregistro}/FT_{nregistro}.html"
+    )
+
+
 @dataclass
 class Block:
     """One piece of the report. ``kind`` decides how each renderer draws it.
@@ -157,6 +166,7 @@ class Block:
     header: list[str] = field(default_factory=list)
     rows: list[list[str]] = field(default_factory=list)
     items: list[Any] = field(default_factory=list)
+    url: str = ""
 
 
 @dataclass
@@ -285,7 +295,8 @@ def generate_report(
         for citation in finding.all_citations:
             medicine = names.get(citation.nregistro, "Medicine")
             add(Block("source", f"{medicine} (reg. {citation.nregistro}), {_section_label(citation.seccion)}",
-                      label="Source"))
+                      label="Source",
+                      url=cima_source_url(citation.nregistro)))
             add(Block("quote", citation.literal_quote))
 
 
@@ -305,6 +316,10 @@ def generate_report(
         add(Block("note", "This report checks a proposed medicine against the patient's current "
                           "medicines, using the official technical sheets. It informs the "
                           "prescriber; it is not a decision."))
+        add(Block("note",
+            "Scope: findings concern the proposed medicine and its relationship "
+            "to current medicines. Run a full medication review to assess "
+            "existing medication concerns separately."))
     else:
         add(Block("title", "Medication review report"))
         meta.append(("Medicines reviewed",
@@ -333,7 +348,7 @@ def generate_report(
     summary_rows = [[title, "Not checked" if tipo in unchecked else str(counts[tipo])]
                     for tipo, title, _ in FINDING_SECTIONS]
     if not_found:
-        summary_rows.append(["Pairs checked with no information found", str(len(not_found))])
+        summary_rows.append(["Directional evidence checks with no information found", str(len(not_found))])
     if failed:
         summary_rows.append(["Checks that could not be completed", str(len(failed))])
     add(Block("table", header=["Check", "Result"], rows=summary_rows))
@@ -358,14 +373,26 @@ def generate_report(
         if not items and tipo in unchecked:
             add(Block("note", "Not checked: this part of the system was not available for this report."))
         elif not items:
-            add(Block("para", "None found."))
+            if tipo == "interaccion":
+                add(Block("para",
+                    "No interaction alerts were generated from the available checks. "
+                    "This does not establish that the combination is safe."))
+            else:
+                add(Block("para", "None found."))
         for i, finding in enumerate(items, start=1):
             if len(items) > 1:
                 add(Block("h3", f"Finding {number}.{i}"))
             add_finding(finding)
         if tipo == "interaccion" and not_found:
-            add(Block("h3", "Pairs checked with no information found"))
-            add(Block("bullets", items=not_found))
+            add(Block("h3", "Directional evidence checks with no information found"))
+            grouped = {}
+            for entry in not_found:
+                grouped[entry] = grouped.get(entry, 0) + 1
+            add(Block("bullets", items=[
+                f"{entry} ({count} directional checks)" if count > 1
+                else entry
+                for entry, count in grouped.items()
+            ]))
             add(Block("note", "No information in the available documents does not mean "
                               "the combination is safe."))
 
@@ -448,7 +475,8 @@ def render_markdown(blocks: list[Block]) -> str:
         elif b.kind == "numbered":
             out.append("\n".join(f"{n}. {_md(i)}" for n, i in enumerate(b.items, start=1)))
         elif b.kind == "source":
-            out.append(f"**{_md(b.label)}:** {_md(b.text)}")
+            link = f" ? [Open CIMA technical sheet]({b.url})" if b.url else ""
+            out.append(f"**{_md(b.label)}:** {_md(b.text)}" + link)
         elif b.kind == "quote":
             out.append(f"> “{_md(b.text)}”")
         elif b.kind == "footer":

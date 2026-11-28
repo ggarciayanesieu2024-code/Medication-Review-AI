@@ -249,7 +249,7 @@ def test_without_rules_duplicates_use_names_and_the_rest_is_not_checked():
     patient = _patient([("68339", "Dra. Martín (Traumatología)")])  # paracetamol
     model = FakeModel()
     result = check_new_medicine(patient, _proposed("85780"), CATALOGUE, review=model)  # Antidol
-    assert model.calls == [("85780", "paracetamol"), ("68339", "paracetamol")]
+    assert model.calls == []
     [finding] = result.findings
     assert finding.tipo == "duplicado" and "paracetamol" in finding.descripcion
     assert result.unchecked == {"advertencia_atc", "cascada"}
@@ -420,3 +420,60 @@ def test_rules_status_ready(monkeypatch, tmp_path):
     path = tmp_path / "prescriptions.json"
     path.write_text("{}", encoding="utf-8")
     assert rules_status(path) == (True, "connected")
+
+def test_duplicate_ingredient_does_not_trigger_self_interactions():
+    patient = _patient([
+        ("68339", "Doctor A"),
+        ("85780", "Doctor B"),
+    ])
+
+    model = FakeModel({
+        ("68339", "paracetamol"): "found",
+        ("85780", "paracetamol"): "found",
+    })
+
+    result = review_patient(
+        patient,
+        CATALOGUE,
+        use_model=True,
+        review=model,
+    )
+
+    assert model.calls == []
+    assert planned_questions(patient, None, CATALOGUE) == 0
+    assert any(f.tipo == "duplicado" for f in result.findings)
+    assert not any(f.tipo == "interaccion" for f in result.findings)
+
+
+
+def test_repeated_search_reuses_result_within_review():
+    patient = _patient([
+        ("68339", "Doctor A"),
+        ("85780", "Doctor B"),
+    ])
+
+    model = FakeModel()
+
+    result = check_new_medicine(
+        patient,
+        _proposed("88372"),
+        CATALOGUE,
+        review=model,
+    )
+
+    assert model.calls.count(
+        ("88372", "paracetamol")
+    ) == 1
+
+    assert len(model.calls) == 3
+    assert len(result.log) == 4
+
+    # A separate review must not reuse the previous cache.
+    check_new_medicine(
+        patient,
+        _proposed("88372"),
+        CATALOGUE,
+        review=model,
+    )
+
+    assert len(model.calls) == 6

@@ -79,7 +79,14 @@ def render_html(report: Report) -> str:
         elif b.kind == "numbered":
             parts.append("<ol>" + "".join(f"<li>{e(i)}</li>" for i in b.items) + "</ol>")
         elif b.kind == "source":
-            parts.append(f"<p><strong>{e(b.label)}:</strong> {e(b.text)}</p>")
+            link = (
+                f' ? <a href="{e(b.url)}" target="_blank" rel="noopener noreferrer">'
+                'Open CIMA technical sheet</a>'
+                if b.url else ""
+            )
+            parts.append(
+                f"<p><strong>{e(b.label)}:</strong> {e(b.text)}{link}</p>"
+            )
         elif b.kind == "quote":
             parts.append(f"<blockquote>“{e(b.text)}”</blockquote>")
         elif b.kind == "footer":
@@ -188,7 +195,14 @@ def render_pdf(report: Report) -> bytes:
         elif b.kind == "numbered":
             story += [Paragraph(_p(i), st["list"], bulletText=f"{n}.") for n, i in enumerate(b.items, 1)]
         elif b.kind == "source":
-            story.append(Paragraph(f"<b>{_p(b.label)}:</b> {_p(b.text)}", st["para"]))
+            link = (
+                f' ? <link href="{_p(b.url)}" color="#0f766e">'
+                'Open CIMA technical sheet</link>'
+                if b.url else ""
+            )
+            story.append(Paragraph(
+                f"<b>{_p(b.label)}:</b> {_p(b.text)}{link}", st["para"]
+            ))
         elif b.kind == "quote":
             story += [boxed(Paragraph(f"“{_p(b.text)}”", st["quote"]),
                             bg=colors.HexColor("#f6f7f9"), edge=colors.HexColor("#9ca3af"), left_bar=True),

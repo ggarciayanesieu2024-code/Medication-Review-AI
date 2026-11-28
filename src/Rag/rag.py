@@ -27,7 +27,13 @@ from groq import GroqError
 from pydantic import ValidationError
 
 from src.Rag.busqueda import search_fragments
-from src.config import FORBIDDEN_PHRASES, K_RESULTS, MIN_QUOTE_WORDS
+from src.config import (
+    FORBIDDEN_PHRASES,
+    K_RESULTS,
+    MIN_QUOTE_WORDS,
+    PRESCRIPTIONS_FILE,
+    PROJECT_ROOT,
+)
 from src.llm import StructuredOutputRAG, llm_medication_review
 from src.Rag.verificacion import Fragment, verificar_cita
 
@@ -60,6 +66,10 @@ SAFETY RULES
 CITATION RULES
 - Support every factual finding with quotations from the supplied fragments.
 - Copy each quotation exactly, without translating or correcting its wording.
+- Preserve the original punctuation. Never add, remove, or correct commas.
+- Prefer short, exact quotations that directly support each factual claim.
+- Do not add redundant citations when existing citations fully support the answer.
+- Preserve all relevant clinical qualifications and exceptions.
 - Each quotation must contain at least six words.
 - Use the exact nregistro and seccion of the fragment containing that quotation.
 - Preserve subsection numbers: 4.5.1 must not be labelled as 4.5.
@@ -167,7 +177,52 @@ def normalise_text(text: str) -> str:
     text = "".join(character for character in text if not unicodedata.combining(character))
     return " ".join(text.split())
 
+# Reviewed ATC groups and their Spanish names in CIMA.
+# Source: https://atcddd.fhi.no/atc_ddd_index/?code=C03C
+ATC_CLASS_TERMS = {
+    "C03C": ("diuréticos del asa",),
+}
 
+
+def verified_class_terms(ingredient: str) -> tuple[str, ...]:
+    """Resolve class names from catalogue entries and AEMPS ATC codes."""
+    catalogue_file = PROJECT_ROOT / "data" / "catalogo_medicamentos.json"
+
+    if not catalogue_file.exists() or not PRESCRIPTIONS_FILE.exists():
+        return ()
+
+    catalogue = json.loads(
+        catalogue_file.read_text(encoding="utf-8")
+    )
+
+    registrations = {
+        str(entry["nregistro"])
+        for entry in catalogue["medicamentos"]
+        if len(entry["principios_activos"]) == 1
+        and normalise_text(entry["principios_activos"][0])
+        == normalise_text(ingredient)
+    }
+
+    if not registrations:
+        return ()
+
+    records = json.loads(
+        PRESCRIPTIONS_FILE.read_text(encoding="utf-8")
+    )["prescripciones"]
+
+    codes = {
+        record["cod_atc"]
+        for record in records
+        if str(record["nro_definitivo"]) in registrations
+        and record.get("cod_atc")
+    }
+
+    return tuple(sorted({
+        term
+        for prefix, terms in ATC_CLASS_TERMS.items()
+        if codes and all(code.startswith(prefix) for code in codes)
+        for term in terms
+    }))
 def build_messages(
     question: str,
     fragments: list,
@@ -205,7 +260,7 @@ def prepare_general_search(
     sections: list[str] | None = None,
     k: int = K_RESULTS,
     required_mention: str | None = None,
-    system_prompt: str = GENERAL_SYSTEM_PROMPT,
+    system_prompt: str = GENERAL_SYSTEM_PROMPT, alternative_mentions: tuple[str, ...] = (),
 ) -> dict:
     """Retrieve evidence and prepare a request, without calling the LLM."""
     question = question.strip()
@@ -226,10 +281,19 @@ def prepare_general_search(
     # 2. For interaction searches, require an ingredient mention.
     # This is a simple text filter, not proof that an interaction exists.
     if required_mention is not None:
+        mentions = [required_mention] + [
+            normalise_text(term)
+            for term in alternative_mentions
+            if term.strip()
+        ]
+
         fragments = [
             fragment
             for fragment in fragments
-            if required_mention in normalise_text(fragment["texto"])
+            if any(
+                term in normalise_text(fragment["texto"])
+                for term in mentions
+            )
         ]
 
     # 3. Without evidence, do not prepare a request for the LLM.
@@ -255,31 +319,167 @@ def prepare_interaction_search(
     ingredient_y: str,
     k: int = K_RESULTS,
 ) -> dict:
-    """Prepare an interaction question using medicine x's section 4.5."""
+    """Prepare an interaction search using verified ingredient classes."""
     ingredient_y = ingredient_y.strip()
 
     if not ingredient_y:
         raise ValueError("The other medicine's ingredient cannot be empty.")
 
+    class_terms = verified_class_terms(ingredient_y)
+
+    question = (
+        f"¿Qué posible interacción se describe con {ingredient_y} "
+        "en la información del medicamento indicado?"
+    )
+
+    if class_terms:
+        question += (
+            f" Clasificación ATC verificada de {ingredient_y}: "
+            f"{', '.join(class_terms)}."
+            " Esta clasificación permite interpretar referencias "
+            "a la clase, pero no demuestra por sí sola una interacción."
+        )
+
     return prepare_general_search(
-        question=(
-            f"¿Qué posible interacción se describe con {ingredient_y} "
-            "en la información del medicamento indicado?"
-        ),
+        question=question,
         nregistro=nregistro_x,
         sections=["4.5"],
         k=k,
         required_mention=ingredient_y,
         system_prompt=INTERACTION_SYSTEM_PROMPT,
+        alternative_mentions=class_terms,
     )
 
 
-def run_prepared_request(prepared: dict, *, generation_options: dict | None = None) -> dict:
-    """Generate and check an answer from a request prepared by this module.
 
-    Rejected answers are not returned. API failures remain separate from
-    missing evidence. Invalid search inputs and retrieval errors still raise.
-    """
+MAX_CONTEXT_BYTES = 20000
+CONTEXT_RETRY_RESERVE = 1000
+
+
+def serialized_message_size(messages):
+    return len(json.dumps(messages).encode("utf-8"))
+
+
+def compact_standalone_context(prepared):
+    """Select original source excerpts within a request budget."""
+    import re
+
+    fragments = prepared["fragments"]
+    messages = list(prepared["messages"])
+    budget = MAX_CONTEXT_BYTES - CONTEXT_RETRY_RESERVE
+
+    if serialized_message_size(messages) <= budget:
+        return fragments, messages, False
+
+    question = prepared["question"]
+
+    system_prompt = messages[0]["content"] + (
+        "\n\nCONTEXT LIMITATION: Some source sections may be "
+        "omitted or supplied as excerpts. Do not imply exhaustive "
+        "coverage. Preserve clinical qualifications and acknowledge "
+        "insufficient evidence."
+    )
+
+    stopwords = {
+        "what", "which", "does", "with", "about", "should",
+        "para", "sobre", "como", "cuales", "describe",
+        "medicamento", "medicina"
+    }
+
+    terms = set(
+        re.findall(r"\b\w{4,}\b", normalise_text(question))
+    ) - stopwords
+
+    def relevance(text):
+        normalized = normalise_text(text)
+        return sum(term in normalized for term in terms)
+
+    candidates = []
+
+    for rank, fragment in enumerate(fragments):
+        text = fragment["texto"]
+
+        if len(text.encode("utf-8")) <= 4000:
+            candidates.append(
+                (relevance(text), rank, fragment)
+            )
+            continue
+
+        paragraphs = list(re.finditer(r"[^\n]+", text))
+        windows = {}
+
+        for i, paragraph in enumerate(paragraphs):
+            if len(paragraph.group().encode("utf-8")) > 4000:
+                continue
+
+            left = right = i
+
+            for neighbour in (i - 1, i + 1):
+                if not 0 <= neighbour < len(paragraphs):
+                    continue
+
+                lo = min(left, neighbour)
+                hi = max(right, neighbour)
+
+                excerpt = text[
+                    paragraphs[lo].start():
+                    paragraphs[hi].end()
+                ]
+
+                if len(excerpt.encode("utf-8")) <= 4000:
+                    left, right = lo, hi
+
+            excerpt = text[
+                paragraphs[left].start():
+                paragraphs[right].end()
+            ]
+
+            windows[excerpt] = max(
+                relevance(paragraph.group()),
+                windows.get(excerpt, -1),
+            )
+
+        ranked = sorted(
+            windows,
+            key=windows.get,
+            reverse=True,
+        )
+
+        for excerpt in ranked[:3]:
+            candidates.append((
+                windows[excerpt],
+                rank,
+                {**fragment, "texto": excerpt},
+            ))
+
+    candidates.sort(key=lambda item: (-item[0], item[1]))
+
+    selected = []
+
+    for _, _, fragment in candidates:
+        candidate = selected + [fragment]
+
+        candidate_messages = build_messages(
+            question, candidate, system_prompt
+        )
+
+        if serialized_message_size(candidate_messages) <= budget:
+            selected.append(fragment)
+
+    return (
+        selected,
+        build_messages(question, selected, system_prompt),
+        True,
+    )
+
+
+def run_prepared_request(
+    prepared: dict,
+    *,
+    generation_options: dict | None = None,
+) -> dict:
+    """Generate, validate and verify an evidence-grounded answer."""
+
     result = {
         "status": "not_found",
         "question": prepared["question"],
@@ -288,76 +488,145 @@ def run_prepared_request(prepared: dict, *, generation_options: dict | None = No
         "reason": None,
     }
 
-    # No sources means no API call, not a conclusion about medicine safety.
     if not prepared["fragments"]:
         result["reason"] = "no_evidence"
         result["response"] = StructuredOutputRAG(
             status="not_found",
-            description="No se encontró información relevante en los fragmentos consultados.",
+            description=(
+                "No se encontró información relevante "
+                "en los fragmentos consultados."
+            ),
             citations=[],
         ).model_dump(exclude_none=True)
         return result
 
-    # Validate source shapes before paying for a generation request.
-    sources = [Fragment.model_validate(fragment) for fragment in prepared["fragments"]]
-    messages = list(prepared["messages"])
+    selected, messages, context_limited = (
+        compact_standalone_context(prepared)
+    )
 
+    sources = [
+        Fragment.model_validate(fragment)
+        for fragment in selected
+    ]
+
+    result["generation_fragments"] = selected
+    result["context_limited"] = context_limited
+
+    if not sources:
+        result.update(
+            status="error",
+            reason="context_too_large",
+        )
+        return result
+
+    # Allow one corrective attempt for invalid JSON or citations.
     for attempt in range(2):
+        if serialized_message_size(messages) > MAX_CONTEXT_BYTES:
+            result.update(
+                status="error",
+                reason="context_too_large",
+            )
+            return result
         try:
-            response = llm_medication_review(messages, **(generation_options or {}))
-            break
+            response = llm_medication_review(
+                messages,
+                **(generation_options or {}),
+            )
+
         except ValidationError:
             if attempt == 1:
-                result.update(status="rejected", reason="invalid_response")
+                result.update(
+                    status="rejected",
+                    reason="invalid_response",
+                )
                 return result
-            # Reuse the same evidence and instructions for one fresh attempt.
+
             messages.append({
                 "role": "user",
                 "content": (
-                    "The previous response failed JSON/schema validation. "
-                    "Return only the JSON object specified in the system prompt. "
-                    "Use status found or not_found, a nonempty description, and "
-                    "citations with nregistro, seccion, and literal_quote. "
-                    "found requires citations; not_found requires an empty list. "
-                    "Use only the original supplied evidence."
+                    "The previous response failed schema validation. "
+                    "Return valid JSON following the original schema. "
+                    "Use only the supplied evidence."
                 ),
             })
+            continue
+
         except ValueError:
-            # The client rejects empty or token-truncated API responses.
-            result.update(status="rejected", reason="invalid_response")
-            return result
-        except (GroqError, RuntimeError):
-            # Includes API failures and a missing key; never label these not_found.
-            result.update(status="error", reason="generation_failed")
+            result.update(
+                status="rejected",
+                reason="invalid_response",
+            )
             return result
 
-    # Apply the same normalisation to the phrase list and generated text.
-    # Check each field separately so phrases cannot span unrelated fields.
-    generated_texts = [response.description] + [
-        citation.literal_quote for citation in response.citations
-    ]
-    if any(
-        normalise_text(phrase) in normalise_text(text)
-        for text in generated_texts
-        for phrase in FORBIDDEN_PHRASES
-    ):
-        result.update(status="rejected", reason="forbidden_phrase")
+        except (GroqError, RuntimeError) as exc:
+            result.update(
+                status="error",
+                reason=(
+                    "context_too_large"
+                    if getattr(exc, "status_code", None) == 413
+                    else "generation_failed"
+                ),
+            )
+            return result
+
+        generated_texts = [response.description] + [
+            citation.literal_quote
+            for citation in response.citations
+        ]
+
+        if any(
+            normalise_text(phrase) in normalise_text(text)
+            for text in generated_texts
+            for phrase in FORBIDDEN_PHRASES
+        ):
+            result.update(
+                status="rejected",
+                reason="forbidden_phrase",
+            )
+            return result
+
+        invalid_citations = [
+            citation
+            for citation in response.citations
+            if not any(
+                verificar_cita(citation, source)
+                for source in sources
+            )
+        ]
+
+        if invalid_citations:
+            if attempt == 1:
+                result.update(
+                    status="rejected",
+                    reason="invalid_citation",
+                )
+                return result
+
+            messages.append({
+                "role": "user",
+                "content": (
+                    "The previous answer contained an invalid citation. "
+                    "Regenerate the answer using only the original sources. "
+                    "Copy quotations verbatim, including punctuation. "
+                    "Each quotation must contain at least six words. "
+                    "Use the exact registration and section identifiers. "
+                    "Every factual claim must remain supported. "
+                    "Remove unsupported claims rather than invent evidence."
+                ),
+            })
+            continue
+
+        result["status"] = response.status
+        result["response"] = response.model_dump(
+            exclude_none=True
+        )
+
+        if response.status == "not_found":
+            result["reason"] = "insufficient_evidence"
+
         return result
 
-    # Only sources actually supplied to this request can support its citations.
-    # Reject the whole answer if any citation fails, rather than keeping claims
-    # whose supporting quotation was removed.
-    for citation in response.citations:
-        if not any(verificar_cita(citation, source) for source in sources):
-            result.update(status="rejected", reason="invalid_citation")
-            return result
-
-    result["status"] = response.status
-    result["response"] = response.model_dump(exclude_none=True)
-    if response.status == "not_found":
-        result["reason"] = "insufficient_evidence"
     return result
-
 
 def answer_question(
     question: str,
@@ -452,29 +721,216 @@ Do not write F IDs in the answer prose; supporting checks will be displayed.
 If evidence is insufficient, explain what cannot be answered and set status
 not_found, citations [] and finding_ids [].
 """
-    messages = [
-        {"role": "system", "content": instructions},
-        {"role": "user", "content": json.dumps({
-            "question": question, "patient": patient,
-            "fragments": [source.model_dump() for source in sources],
-            "findings": evidence, "limitations": limitations,
-        }, ensure_ascii=False)},
-    ]
-    try:
-        answer = llm_answer_patient_question(messages, **(generation_options or {}))
-    except (ValidationError, ValueError):
-        return {"status": "rejected", "response": None, "reason": "invalid_response"}
-    except (GroqError, RuntimeError):
-        return {"status": "error", "response": None, "reason": "generation_failed"}
 
-    texts = [answer.answer] + [citation.literal_quote for citation in answer.citations]
-    if any(normalise_text(phrase) in normalise_text(text)
-           for text in texts for phrase in FORBIDDEN_PHRASES):
-        return {"status": "rejected", "response": None, "reason": "forbidden_phrase"}
-    if any(not any(verificar_cita(citation, source) for source in sources)
-           for citation in answer.citations):
-        return {"status": "rejected", "response": None, "reason": "invalid_citation"}
-    if set(answer.finding_ids) - {finding["id"] for finding in evidence}:
-        return {"status": "rejected", "response": None, "reason": "invalid_citation"}
-    return {"status": answer.status, "response": answer.model_dump(),
-            "reason": None if answer.status == "found" else "insufficient_evidence"}
+    # Conservative request-size budget for patient questions.
+    MAX_CONTEXT_BYTES = 20000
+
+    def build_patient_messages(selected_sources, context_limited=False):
+        context_limitations = list(limitations)
+
+        if context_limited:
+            context_limitations.append(
+                "Some retrieved technical-sheet sections were omitted "
+                "because of the request-size limit. The review is not exhaustive."
+            )
+
+        return [
+            {"role": "system", "content": instructions},
+            {
+                "role": "user",
+                "content": json.dumps({
+                    "question": question,
+                    "patient": patient,
+                    "fragments": [
+                        source.model_dump()
+                        for source in selected_sources
+                    ],
+                    "findings": evidence,
+                    "limitations": context_limitations,
+                }, ensure_ascii=False),
+            },
+        ]
+
+    def message_size(messages):
+        return len(
+            json.dumps(messages, ensure_ascii=False).encode("utf-8")
+        )
+
+    # Group sources by medicine, retaining retrieval order.
+    grouped = {}
+
+    for source in sources:
+        grouped.setdefault(source.nregistro, []).append(source)
+
+    # Prioritize the proposed medicine, when there is one.
+    proposed_id = (
+        patient.get("proposed_medicine") or {}
+    ).get("nregistro")
+
+    registrations = list(grouped)
+
+    if proposed_id in registrations:
+        registrations.remove(proposed_id)
+        registrations.insert(0, proposed_id)
+
+    # Interleave medicines so one medicine cannot consume
+    # the entire available context.
+    ordered_sources = []
+
+    for rank in range(max(map(len, grouped.values()), default=0)):
+        for registration in registrations:
+            group = grouped[registration]
+
+            if rank < len(group):
+                ordered_sources.append(group[rank])
+
+    selected_sources = []
+
+    for source in ordered_sources:
+        candidate = selected_sources + [source]
+
+        candidate_messages = build_patient_messages(
+            candidate,
+            context_limited=True,
+        )
+
+        if message_size(candidate_messages) <= MAX_CONTEXT_BYTES:
+            selected_sources.append(source)
+
+    # Verify citations only against evidence actually sent.
+    context_limited = len(selected_sources) < len(sources)
+    sources = selected_sources
+
+    messages = build_patient_messages(
+        sources,
+        context_limited=context_limited,
+    )
+
+    if message_size(messages) > MAX_CONTEXT_BYTES:
+        return {
+            "status": "error",
+            "response": None,
+            "reason": "context_too_large",
+        }
+
+    if not sources and not evidence:
+        return {
+            "status": "not_found",
+            "response": {
+                "status": "not_found",
+                "answer": (
+                    "No supporting information could be included "
+                    "within the available context limit. "
+                    "This does not establish safety."
+                ),
+                "citations": [],
+                "finding_ids": [],
+            },
+            "reason": "insufficient_evidence",
+        }
+    # Allow one corrective retry.
+    for attempt in range(2):
+        if message_size(messages) > MAX_CONTEXT_BYTES:
+            return {
+                "status": "error",
+                "response": None,
+                "reason": "context_too_large",
+            }
+
+        try:
+            answer = llm_answer_patient_question(
+                messages,
+                **(generation_options or {}),
+            )
+
+        except (ValidationError, ValueError):
+            if attempt == 1:
+                return {
+                    "status": "rejected",
+                    "response": None,
+                    "reason": "invalid_response",
+                }
+
+            messages.append({
+                "role": "user",
+                "content": (
+                    "The previous response failed validation. "
+                    "Return valid JSON using only supplied evidence."
+                ),
+            })
+            continue
+
+        except (GroqError, RuntimeError) as exc:
+            return {
+                "status": "error",
+                "response": None,
+                "reason": (
+                    "context_too_large"
+                    if getattr(exc, "status_code", None) == 413
+                    else "generation_failed"
+                ),
+            }
+
+        texts = [answer.answer] + [
+            citation.literal_quote
+            for citation in answer.citations
+        ]
+
+        if any(
+            normalise_text(phrase) in normalise_text(text)
+            for text in texts
+            for phrase in FORBIDDEN_PHRASES
+        ):
+            return {
+                "status": "rejected",
+                "response": None,
+                "reason": "forbidden_phrase",
+            }
+
+        invalid_citations = any(
+            not any(
+                verificar_cita(citation, source)
+                for source in sources
+            )
+            for citation in answer.citations
+        )
+
+        invalid_findings = (
+            set(answer.finding_ids)
+            - {finding["id"] for finding in evidence}
+        )
+
+        if invalid_citations or invalid_findings:
+            if attempt == 1:
+                return {
+                    "status": "rejected",
+                    "response": None,
+                    "reason": "invalid_citation",
+                }
+
+            messages.append({
+                "role": "user",
+                "content": (
+                    "The previous answer contained invalid references. "
+                    "Copy quotations exactly, including punctuation. "
+                    "Use exact registration and section identifiers. "
+                    "Use only supplied finding IDs. "
+                    "Omit unsupported claims."
+                ),
+            })
+            continue
+
+        return {
+            "status": answer.status,
+            "response": answer.model_dump(),
+            "reason": (
+                None if answer.status == "found"
+                else "insufficient_evidence"
+            ),
+        }
+
+    return {
+        "status": "rejected",
+        "response": None,
+        "reason": "invalid_response",
+    }

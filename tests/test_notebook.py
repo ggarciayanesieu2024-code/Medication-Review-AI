@@ -11,10 +11,29 @@ OPTIONS = {"model": "test-model", "temperature": 0.3}
 
 
 def patient_and_catalogue():
-    patient = main.Patient.model_validate_json(
-        (PATIENTS_DIR / "paciente_A.json").read_text(encoding="utf-8")
+    catalogue = main.load_catalogue()
+
+    patient = main.Patient(
+        id="TEST_NOTEBOOK",
+        edad=78,
+        grupo="desarrollo",
+        medicamentos=[
+            {
+                "nregistro": "68339",
+                "nombre": catalogue["68339"].nombre,
+                "dosis": "1 al día",
+                "prescriptor": "Doctor A",
+            },
+            {
+                "nregistro": "59718",
+                "nombre": catalogue["59718"].nombre,
+                "dosis": "1 al día",
+                "prescriptor": "Doctor B",
+            },
+        ],
     )
-    return patient, main.load_catalogue()
+
+    return patient, catalogue
 
 
 def test_standard_patient_review_uses_notebook_retrieval_and_generation_options(monkeypatch):

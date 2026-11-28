@@ -25,8 +25,6 @@ Run from the project root:
 
 from functools import lru_cache
 
-import chromadb
-from sentence_transformers import SentenceTransformer
 
 # Indexing and search share settings from config.py.
 from src.config import (
@@ -45,6 +43,9 @@ def load_search_resources():
     """Load the database collection and E5 once per Python process."""
     if not DATABASE_DIR.exists():
         raise FileNotFoundError("Database folder missing. Run python -m src.Rag.indice first.")
+
+    import chromadb
+    from sentence_transformers import SentenceTransformer
 
     client = chromadb.PersistentClient(path=str(DATABASE_DIR))
     collection = client.get_collection(

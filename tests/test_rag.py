@@ -212,3 +212,221 @@ def test_multiple_verified_citations_are_preserved(pipeline):
     result = rag.review_interaction("0123", "warfarina")
     assert result["status"] == "found"
     assert result["response"]["citations"] == answer["citations"]
+def test_verified_class_based_retrieval(pipeline, monkeypatch):
+    search, generate, _ = pipeline
+
+    monkeypatch.setattr(
+        rag,
+        "verified_class_terms",
+        lambda ingredient: ("diuréticos del asa",)
+        if ingredient == "furosemida" else (),
+    )
+
+    search.return_value = [{
+        "nregistro": "88372",
+        "nombre": "Ibuprofeno",
+        "seccion": "4.5",
+        "titulo": "Interacciones",
+        "texto": (
+            "Los AINEs pueden contrarrestar el efecto "
+            "de los diuréticos del asa."
+        ),
+    }]
+
+    result = rag.prepare_interaction_search(
+        "88372", "furosemida"
+    )
+
+    assert result["status"] == "ready"
+    assert len(result["fragments"]) == 1
+    assert "diuréticos del asa" in result["question"]
+
+    unrelated = rag.prepare_interaction_search(
+        "88372", "paracetamol"
+    )
+
+    assert unrelated["status"] == "not_found"
+    assert unrelated["fragments"] == []
+    generate.assert_not_called()
+def test_invalid_citation_retries_then_succeeds(pipeline):
+    _, generate, answer = pipeline
+
+    invalid = json.loads(json.dumps(answer))
+
+    invalid["citations"][0]["literal_quote"] = (
+        "puede aumentar el efecto, de otros "
+        "medicamentos anticoagulantes"
+    )
+
+    generate.side_effect = [
+        api_response(invalid),
+        api_response(answer),
+    ]
+
+    result = rag.answer_question("Consulta")
+
+    assert result["status"] == "found"
+    assert result["response"] == answer
+    assert generate.call_count == 2
+
+
+
+@pytest.mark.parametrize("correct_on_retry", [True, False])
+def test_patient_context_budget_and_citation_retry(
+    monkeypatch, correct_on_retry
+):
+    valid_source = {
+        "nregistro": "88372",
+        "nombre": "Test medicine",
+        "seccion": "4.3",
+        "titulo": "Contraindicaciones",
+        "texto": "Pacientes con disfuncion renal grave requieren revision profesional.",
+    }
+
+    oversized_source = {
+        "nregistro": "88372",
+        "nombre": "Test medicine",
+        "seccion": "4.4",
+        "titulo": "Advertencias",
+        "texto": "Informacion adicional para revision profesional. " * 1000,
+    }
+
+    monkeypatch.setattr(
+        rag,
+        "search_fragments",
+        lambda *args, **kwargs: [
+            valid_source, oversized_source
+        ],
+    )
+
+    invalid = llm.PatientQuestionAnswer(
+        status="found",
+        answer="Informacion para revision profesional.",
+        citations=[{
+            "nregistro": "88372",
+            "seccion": "4.4",
+            "literal_quote":
+                "Informacion adicional para revision profesional. Informacion adicional",
+        }],
+        finding_ids=[],
+    )
+
+    valid = llm.PatientQuestionAnswer(
+        status="found",
+        answer="La ficha describe disfuncion renal grave.",
+        citations=[{
+            "nregistro": "88372",
+            "seccion": "4.3",
+            "literal_quote": valid_source["texto"],
+        }],
+        finding_ids=[],
+    )
+
+    requests = []
+
+    def fake_answer(messages, **kwargs):
+        requests.append(json.loads(json.dumps(messages)))
+
+        assert len(
+            json.dumps(
+                messages,
+                ensure_ascii=False
+            ).encode("utf-8")
+        ) <= 20000
+
+        payload = json.loads(messages[1]["content"])
+
+        assert len(payload["fragments"]) == 1
+        assert payload["fragments"][0]["seccion"] == "4.3"
+        assert any(
+            "omitted" in item.lower()
+            for item in payload["limitations"]
+        )
+
+        if len(requests) == 1:
+            return invalid
+
+        return valid if correct_on_retry else invalid
+
+    monkeypatch.setattr(
+        llm,
+        "llm_answer_patient_question",
+        fake_answer,
+    )
+
+    result = rag.answer_patient_question(
+        "Question",
+        "Consulta",
+        {},
+        ["88372"],
+        [],
+        [],
+        k=5,
+    )
+
+    assert len(requests) == 2
+
+    if correct_on_retry:
+        assert result["status"] == "found"
+        assert result["reason"] is None
+    else:
+        assert result["status"] == "rejected"
+        assert result["reason"] == "invalid_citation"
+        assert result["response"] is None
+
+
+
+@pytest.mark.parametrize("cite_omitted_source", [False, True])
+def test_standalone_context_budget(pipeline, cite_omitted_source):
+    search, generate, answer = pipeline
+
+    valid_source = search.return_value[0]
+
+    omitted_source = {
+        "nregistro": "0123",
+        "nombre": "Test medicine",
+        "seccion": "4.4",
+        "titulo": "Warnings",
+        "texto": "Additional information for professional review. " * 1500,
+    }
+
+    search.return_value = [
+        valid_source,
+        omitted_source,
+    ]
+
+    if cite_omitted_source:
+        answer["citations"] = [{
+            "nregistro": "0123",
+            "seccion": "4.4",
+            "literal_quote":
+                "Additional information for professional review.",
+        }]
+
+    def fake_generate(**kwargs):
+        messages = kwargs["messages"]
+
+        assert len(
+            json.dumps(messages).encode("utf-8")
+        ) <= 20000
+
+        payload = json.loads(messages[1]["content"])
+
+        assert len(payload["fragments"]) == 1
+        assert payload["fragments"][0]["seccion"] == "4.5.1"
+
+        return api_response(answer)
+
+    generate.side_effect = fake_generate
+
+    result = rag.answer_question("Consulta")
+
+    assert result["context_limited"] is True
+    assert len(result["fragments"]) == 2
+    assert len(result["generation_fragments"]) == 1
+
+    if cite_omitted_source:
+        assert result["status"] == "rejected"
+        assert result["reason"] == "invalid_citation"
+    else:
+        assert result["status"] == "found"

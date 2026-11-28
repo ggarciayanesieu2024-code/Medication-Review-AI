@@ -148,7 +148,30 @@ Use only registration numbers from the supplied catalogue. Never invent a
 medicine, patient fact, dose or clinical conclusion. Preserve the original
 question's meaning and qualifications. Write search_question in Spanish for
 the CIMA corpus, as a standalone question.
-Use new_medicine when a specific product is being considered for addition.
+INTENT CLASSIFICATION — APPLY IN PRIORITY ORDER:
+
+1. new_medicine: The question considers adding, introducing, prescribing,
+   or starting a medicine that is not currently on the patient's list.
+   This takes priority over review, even when the question uses words
+   such as "review", "check", or "assess".
+   Identify the proposed product using the supplied catalogue.
+
+2. medicine_question: The question asks about a specific medicine
+   without proposing its addition to the patient's treatment.
+
+3. review: The question requests an overall assessment of the existing
+   medicines without proposing a new medicine.
+
+4. clarify: The intended medicine or request cannot be resolved reliably.
+
+Examples:
+- "What should be reviewed if I add a medicine?" -> new_medicine
+  if the proposed product is identifiable; otherwise clarify.
+- "Can I prescribe this medicine alongside the current treatment?"
+  -> new_medicine if the product is identifiable.
+- "What are the side effects of my current medication?"
+  -> medicine_question.
+- "Review all the patient's current medicines." -> review.
 Set proposed_nregistro to its catalogue ID. If the product, strength or brand
 cannot be resolved unambiguously, use clarify and ask which product is meant;
 do not select a brand arbitrarily from an ingredient name. Also clarify unknown
