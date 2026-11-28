@@ -55,7 +55,7 @@ MIN_QUOTE_WORDS = 6
 
 
 # Preliminary phrases to flag unsafe treatment instructions.
-FORBIDDEN_PHRASES = (
+SOURCE_QUOTE_FORBIDDEN_PHRASES = (
     "stop taking",
     "discontinue the medication",
     "reduce the dose",
@@ -67,3 +67,6 @@ FORBIDDEN_PHRASES = (
     "reduzca la dosis",
     "aumente la dosis",
 )
+
+# Additional restrictions for generated prose.
+FORBIDDEN_PHRASES = SOURCE_QUOTE_FORBIDDEN_PHRASES + ('discontinue', 'lower the dose', 'halve the', 'do not take', 'ajustar la dosis', 'ajuste la dosis', 'suspender', 'dejar de tomar', 'cambie a', 'sustituya', 'retire la', 'retire el', 'iniciar tratamiento', 'inicie tratamiento', 'reducir la dosis', 'aumentar la dosis')

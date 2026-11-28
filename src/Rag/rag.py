@@ -36,6 +36,7 @@ from src.config import (
 )
 from src.llm import StructuredOutputRAG, llm_medication_review
 from src.Rag.verificacion import Fragment, verificar_cita
+from src.safety import find_forbidden_phrases
 
 # Shared grounding, safety, and response-format instructions.
 # Both task-specific prompts include these rules.
@@ -180,6 +181,11 @@ def normalise_text(text: str) -> str:
 # Reviewed ATC groups and their Spanish names in CIMA.
 # Source: https://atcddd.fhi.no/atc_ddd_index/?code=C03C
 ATC_CLASS_TERMS = {
+    # https://atcddd.fhi.no/atc_ddd_index/?code=A02BC
+    "A02BC": (
+        "inhibidores de la bomba de protones",
+        "inhibidores de bomba de protones",
+    ),
     "C03C": ("diuréticos del asa",),
 }
 
@@ -314,6 +320,22 @@ def prepare_general_search(
     }
 
 
+CLASS_INTERACTION_GUIDANCE = """
+
+VERIFIED MEDICATION CLASS EVIDENCE:
+- The verified ATC membership supplied in the question is
+  trusted classification metadata.
+- If the source describes an interaction with that verified
+  class, the ingredient does not need to be named individually.
+- Check whether the source describes an applicable class-wide
+  effect and whether any exceptions exclude this ingredient.
+- Cite the relevant class-level passage exactly.
+- Preserve all relevant conditions and exceptions, including
+  statements that concomitant administration is permitted.
+- A documented pharmacological interaction is not necessarily
+  a contraindication or a reason to change treatment.
+"""
+
 def prepare_interaction_search(
     nregistro_x: str,
     ingredient_y: str,
@@ -346,7 +368,10 @@ def prepare_interaction_search(
         sections=["4.5"],
         k=k,
         required_mention=ingredient_y,
-        system_prompt=INTERACTION_SYSTEM_PROMPT,
+        system_prompt=(
+            INTERACTION_SYSTEM_PROMPT + CLASS_INTERACTION_GUIDANCE
+            if class_terms else INTERACTION_SYSTEM_PROMPT
+        ),
         alternative_mentions=class_terms,
     )
 
@@ -569,15 +594,9 @@ def run_prepared_request(
             )
             return result
 
-        generated_texts = [response.description] + [
-            citation.literal_quote
+        if find_forbidden_phrases(response.description) or any(
+            find_forbidden_phrases(citation.literal_quote, source_quote=True)
             for citation in response.citations
-        ]
-
-        if any(
-            normalise_text(phrase) in normalise_text(text)
-            for text in generated_texts
-            for phrase in FORBIDDEN_PHRASES
         ):
             result.update(
                 status="rejected",
@@ -871,15 +890,9 @@ not_found, citations [] and finding_ids [].
                 ),
             }
 
-        texts = [answer.answer] + [
-            citation.literal_quote
+        if find_forbidden_phrases(answer.answer) or any(
+            find_forbidden_phrases(citation.literal_quote, source_quote=True)
             for citation in answer.citations
-        ]
-
-        if any(
-            normalise_text(phrase) in normalise_text(text)
-            for text in texts
-            for phrase in FORBIDDEN_PHRASES
         ):
             return {
                 "status": "rejected",

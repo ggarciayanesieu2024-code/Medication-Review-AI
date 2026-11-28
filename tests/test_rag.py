@@ -430,3 +430,38 @@ def test_standalone_context_budget(pipeline, cite_omitted_source):
         assert result["reason"] == "invalid_citation"
     else:
         assert result["status"] == "found"
+
+
+def test_verified_class_generation_guidance(monkeypatch):
+    monkeypatch.setattr(
+        rag,
+        "verified_class_terms",
+        lambda ingredient: ("verified class",)
+        if ingredient == "class_member" else (),
+    )
+
+    monkeypatch.setattr(
+        rag,
+        "prepare_general_search",
+        lambda question, **kwargs: kwargs,
+    )
+
+    classified = rag.prepare_interaction_search(
+        "64014", "class_member"
+    )
+
+    unrelated = rag.prepare_interaction_search(
+        "64014", "unclassified"
+    )
+
+    assert "VERIFIED MEDICATION CLASS EVIDENCE" in (
+        classified["system_prompt"]
+    )
+
+    assert "VERIFIED MEDICATION CLASS EVIDENCE" not in (
+        unrelated["system_prompt"]
+    )
+
+    assert classified["alternative_mentions"] == (
+        "verified class",
+    )

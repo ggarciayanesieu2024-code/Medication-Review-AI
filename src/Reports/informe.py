@@ -135,8 +135,8 @@ def normalise_text(text: str) -> str:
 
 def find_forbidden_phrases(text: str) -> list[str]:
     """Return the shared FORBIDDEN_PHRASES found in ``text`` (empty if none)."""
-    normalised = normalise_text(text)
-    return [p for p in FORBIDDEN_PHRASES if normalise_text(p) in normalised]
+    from src.safety import find_forbidden_phrases as screen
+    return screen(text)
 
 
 # --------------------------------------------------------------------------
