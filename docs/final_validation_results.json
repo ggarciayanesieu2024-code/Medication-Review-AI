@@ -1,0 +1,212 @@
+{
+  "automated_tests": {
+    "passed": 266,
+    "failed": 0,
+    "expected_failures": 0
+  },
+  "safety_benchmark": {
+    "unsafe_detected_before": 14,
+    "unsafe_detected_after": 29,
+    "unsafe_total": 29,
+    "safe_examples_preserved": 14,
+    "safe_total": 14
+  },
+  "source_database": {
+    "medicines": 23,
+    "fragments": 128
+  },
+  "stored_answers": {
+    "coverage": {
+      "completed": 414,
+      "planned": 435,
+      "missing": 21,
+      "coverage_percent": 95.17,
+      "missing_reason": "Groq API rate limit"
+    },
+    "outcomes": {
+      "not_found": 391,
+      "found": 22,
+      "rejected": 1
+    },
+    "citations_verified": 27,
+    "validation_errors": 0
+  },
+  "patient_evaluation": {
+    "run_date": "2026-11-28",
+    "stored_answers_date": "2026-11-28",
+    "summary": {
+      "patients_fully_correct": 5,
+      "patients": 6,
+      "percent": 83,
+      "by_check": {
+        "duplicates": {
+          "passed": 5,
+          "total": 5,
+          "percent": 100
+        },
+        "interactions": {
+          "passed": 4,
+          "total": 5,
+          "percent": 80
+        },
+        "cascades": {
+          "passed": 1,
+          "total": 1,
+          "percent": 100
+        },
+        "grouping": {
+          "passed": 2,
+          "total": 2,
+          "percent": 100
+        },
+        "safety": {
+          "passed": 6,
+          "total": 6,
+          "percent": 100
+        }
+      }
+    },
+    "patients": [
+      {
+        "patient": "E1",
+        "passed": true,
+        "checks": {
+          "duplicates": {
+            "ok": true,
+            "detail": "expected 1, found 1"
+          },
+          "interactions": {
+            "ok": true,
+            "detail": "expected 0, found 0"
+          },
+          "safety": {
+            "ok": true,
+            "detail": "0 forbidden phrases"
+          }
+        },
+        "family_warnings_not_scored": 0,
+        "searches_not_completed": 0,
+        "pairs_no_evidence": 0
+      },
+      {
+        "patient": "E2",
+        "passed": true,
+        "checks": {
+          "duplicates": {
+            "ok": true,
+            "detail": "expected 0, found 0"
+          },
+          "interactions": {
+            "ok": true,
+            "detail": "expected 0, found 0"
+          },
+          "cascades": {
+            "ok": true,
+            "detail": "expected 1, found 1"
+          },
+          "safety": {
+            "ok": true,
+            "detail": "0 forbidden phrases"
+          }
+        },
+        "family_warnings_not_scored": 0,
+        "searches_not_completed": 0,
+        "pairs_no_evidence": 2
+      },
+      {
+        "patient": "E3",
+        "passed": true,
+        "checks": {
+          "duplicates": {
+            "ok": true,
+            "detail": "expected 0, found 0"
+          },
+          "interactions": {
+            "ok": true,
+            "detail": "expected 1, found 1"
+          },
+          "safety": {
+            "ok": true,
+            "detail": "0 forbidden phrases"
+          }
+        },
+        "family_warnings_not_scored": 0,
+        "searches_not_completed": 0,
+        "pairs_no_evidence": 1
+      },
+      {
+        "patient": "E4",
+        "passed": true,
+        "checks": {
+          "duplicates": {
+            "ok": true,
+            "detail": "expected 0, found 0"
+          },
+          "interactions": {
+            "ok": true,
+            "detail": "expected 0, found 0"
+          },
+          "safety": {
+            "ok": true,
+            "detail": "0 forbidden phrases"
+          }
+        },
+        "family_warnings_not_scored": 1,
+        "searches_not_completed": 0,
+        "pairs_no_evidence": 2
+      },
+      {
+        "patient": "E5",
+        "passed": false,
+        "checks": {
+          "duplicates": {
+            "ok": true,
+            "detail": "expected 0, found 0"
+          },
+          "interactions": {
+            "ok": false,
+            "detail": "expected 1, found 1; incomplete coverage: 1 unchecked items"
+          },
+          "grouping": {
+            "ok": true,
+            "detail": "expected 4 groups, found 4"
+          },
+          "safety": {
+            "ok": true,
+            "detail": "0 forbidden phrases"
+          }
+        },
+        "family_warnings_not_scored": 0,
+        "searches_not_completed": 1,
+        "pairs_no_evidence": 22
+      },
+      {
+        "patient": "E6",
+        "passed": true,
+        "checks": {
+          "grouping": {
+            "ok": true,
+            "detail": "expected 3 groups, found 3"
+          },
+          "safety": {
+            "ok": true,
+            "detail": "0 forbidden phrases"
+          }
+        },
+        "family_warnings_not_scored": 0,
+        "searches_not_completed": 2,
+        "pairs_no_evidence": 18
+      }
+    ]
+  },
+  "notebook": {
+    "offline_code_cells_passed": 11,
+    "development_source_hits": 13,
+    "development_labelled_cases": 13,
+    "live_generation_validation": "pending"
+  },
+  "deployment": {
+    "local_hosted_mode_simulation": "passed",
+    "actual_cloud_deployment": "pending verification"
+  }
+}

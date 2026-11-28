@@ -4,7 +4,7 @@ IE University AI and Machine Learning Foundations group project: a **prototype f
 
 The system flags shared active ingredients, medicines in the same ATC family, possible prescribing cascades, and evidence-supported interactions. It can review a patient's medicines, answer a question using the patient sheet, or check a proposed medicine. Findings include sources and coverage limitations. The clinician decides; the system does not diagnose or prescribe treatment changes.
 
-The Streamlit interface uses the production modules in `src/`. `MAIN.ipynb` runs those same functions locally, with separate stages for inspecting inputs, retrieval, prompts, answers and evaluation. Standalone questions without a patient are available through the notebook/RAG API; the website currently requires a patient.
+The Streamlit interface uses the production modules in `src/`. `MAIN.ipynb` runs those same functions locally, with separate stages for inspecting inputs, retrieval, prompts, answers and evaluation. Standalone medicine questions are available through the website and notebook when live retrieval and model access are configured.
 
 ## 1. Set up Python
 
@@ -72,7 +72,7 @@ Open `MAIN.ipynb` with the project's `.venv` kernel, or launch it with:
 .venv\Scripts\python -m jupyterlab MAIN.ipynb
 ```
 
-Run imports, choose a prepared scenario or custom patient/question in section 1A, then select controls in 1B. Set `k`, optional `generation_options` and the relevant run switches before continuing; the current switches enable model calls and batch evaluation. Sections 3 and 6 inspect rules and the complete patient workflow; sections 4-5 inspect a separate standalone RAG request. Rerun dependent cells after input changes and restart the kernel after editing imported code.
+Run imports, choose a prepared scenario or custom patient/question in section 1A, then select controls in 1B. Set `k`, optional `generation_options` and the relevant run switches before continuing; the default switches enable retrieval-only evaluation and rule-based review. Live model calls can be enabled explicitly. Sections 3 and 6 inspect rules and the complete patient workflow; sections 4-5 inspect a separate standalone RAG request. Rerun dependent cells after input changes and restart the kernel after editing imported code.
 
 Section 2 reuses valid local data, downloads missing medicine sections and rebuilds the index when its stored contents differ. Optional update checks report changes without refreshing existing sections. This preparation can change source coverage. For manual data preparation, the existing modules can also be run from the root: `python -m src.Data.download_nomenclator`, `python -m src.Data.parse_nomenclator`, `python -m src.Data.parse_cima --help`, and `python -m src.Rag.indice`.
 
@@ -95,3 +95,10 @@ Some mathematical symbols appear as `?` in the supplied CIMA sections. Long sect
 ## Shared data
 
 Large raw/generated data and local indexes are not in Git. The team's shared CIMA snapshot is `fragmentos_cima_2026-11-10_v3.json` (18 registrations, 99 sections). Place it at `data/processed/fragmentos_cima.json` before preparation. Obtain the parsed nomenclator through the shared data or the preparation scripts. Check supplied SHA256 values with `Get-FileHash <file> -Algorithm SHA256`. If notebook preparation updates the sources, recheck affected benchmark labels and snapshot hashes.
+
+
+## Final validation
+
+The final prototype passed 266 automated tests. The stored-answer database covers 414 of 435 planned searches, with 27 verified quotations and zero validation errors.
+
+See [Final project validation](docs/final_validation.md) for evaluation results, deployment instructions and remaining limitations.

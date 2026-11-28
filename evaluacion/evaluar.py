@@ -173,35 +173,20 @@ def observed(raw: dict, patient: Patient, catalogue, rule_data, review) -> dict:
     # Cascades: a list of (trigger medicine name, treatment medicine name).
     cascades = [(c.index_medication.name, c.cascade_medication.name) for c in rules["cascades"]]
 
-    # INTERACTIONS. The review log has one entry per model question, saying which
-    # technical sheet was searched and for which ingredient, and whether the
-    # answer was "found". The finding itself only keeps the sheet that holds the
-    # quotation, not the second medicine. So we rebuild the pair: the second
-    # medicine is the patient's medicine whose ingredient was searched for.
-    interactions: dict[frozenset, set] = {}  # pair -> {(sheet, section), ...}
-    # Log entries whose model answer was "found" (the others found nothing).
-    found_logs = [e for e in result.log if e["status"] == "found"]
-    # The interaction findings the review produced, in the same order.
-    found_findings = [f for f in result.findings if f.tipo == "interaccion"]
-    # Both lists are filled in the same order (one finding per "found" answer),
-    # so zip() walks them side by side.
-    for entry, finding in zip(found_logs, found_findings):
-        for med in patient.medicamentos:  # try every medicine of the patient
-            cat = catalogue.get(med.nregistro)  # its catalogue entry, if any
-            # Skip the sheet's own medicine, then check whether this medicine
-            # contains the ingredient that was searched for (case-insensitive).
-            if med.nregistro != entry["sheet"] and cat and any(
-                i.casefold() == entry["ingredient"].casefold() for i in cat.principios_activos
-            ):
-                # The pair = the sheet's medicine + the medicine that has the
-                # searched ingredient. frozenset again, so order does not matter.
-                pair = frozenset((entry["sheet"], med.nregistro))
-                # setdefault creates the empty set the first time we see a pair.
-                cited = interactions.setdefault(pair, set())
-                if finding.cita:  # only if the finding has a quotation
-                    # Remember (sheet, section) of the quotation, so we can check
-                    # later that the right section was cited (for example 4.5).
-                    cited.add((finding.cita.nregistro, finding.cita.seccion))
+    interactions = {}
+
+    for entry in result.log:
+        if entry.get("interaction_detected") is not True:
+            continue
+
+        pair = frozenset(entry["pair"])
+        cited = interactions.setdefault(pair, set())
+
+        for citation in entry.get("citations", []):
+            cited.add((
+                citation["nregistro"],
+                citation["seccion"],
+            ))
 
     # Grouping by prescriber: {prescriber: [registration numbers]}. This is the
     # same grouping the report prints in its first block.
@@ -309,7 +294,12 @@ def check_safety(obs: dict) -> tuple[bool, str]:
     system never recommends stopping, changing or starting a medicine)."""
     # casefold() ignores upper/lower case. The list comprehension collects every
     # forbidden phrase found in any generated text.
-    bad = [p for p in FORBIDDEN_PHRASES for t in obs["texts"] if p.casefold() in t.casefold()]
+    from src.safety import find_forbidden_phrases
+    bad = [
+        hit
+        for text in obs["texts"]
+        for hit in find_forbidden_phrases(text)
+    ]
     return not bad, f"{len(bad)} forbidden phrases"  # empty list -> passed
 
 
@@ -321,9 +311,22 @@ def evaluate(raw: dict, catalogue, rule_data, review) -> dict:
     # Duplicates, interactions and cascades are only scored when the patient has
     # a label for them. EVAL_P4 only labels the grouping, so it skips these three
     # instead of being scored against an expectation nobody wrote.
-    if "duplicidades" in exp or "interacciones" in exp:
+    if "duplicidades" in exp:
         checks["duplicates"] = check_duplicates(exp, obs)
-        checks["interactions"] = check_interactions(exp, obs)
+
+    if "interacciones" in exp:
+        ok, detail = check_interactions(exp, obs)
+
+        if obs["not_completed"]:
+            ok = False
+            detail += (
+                f"; incomplete coverage: "
+                f"{obs['not_completed']} unchecked items"
+            )
+
+        checks["interactions"] = (ok, detail)
+
+    if "cascadas" in exp:
         checks["cascades"] = check_cascades(exp, obs)
     grouping = check_grouping(exp, obs)  # None if the patient has no label
     if grouping:
@@ -384,13 +387,22 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     # Optional flag: "--only E5" evaluates just that patient.
     parser.add_argument("--only", help="evaluate a single patient id, for example E5")
+    parser.add_argument(
+        "--stored-answers",
+        type=Path,
+        help="Evaluate using an alternative stored-answer file.",
+    )
     args = parser.parse_args(argv)  # read what the user typed
 
     # The same data sources the app uses, so the evaluation measures the real
     # system and not a copy of it.
     catalogue = load_catalogue()  # the list of medicines the app knows
     rule_data = load_rule_data(catalogue=catalogue)  # codes + cascade table
-    stored = load_stored_answers()  # the model answers saved on 2026-11-23
+    stored = (
+        load_stored_answers(args.stored_answers)
+        if args.stored_answers
+        else load_stored_answers()
+    )  # the model answers saved on 2026-11-23
     if stored is None:
         # Without the stored answers there is nothing to compare for interactions.
         print("data/interacciones_guardadas.json not found: interactions cannot be evaluated.")

@@ -723,6 +723,10 @@ def _ask_model(
             if interaction is not True and interaction is not False:
                 result.could_not_check.append(f"{label}: {REASON_TEXT['invalid_response']}.")
                 continue
+            result.log[-1]["interaction_detected"] = interaction
+            result.log[-1]["pair"] = [x.nregistro, y.nregistro]
+            result.log[-1]["citations"] = citations
+
             who = _join([y.prescriptor, x.prescriptor if x.prescriptor != "Not specified" else ""])
             result.findings.append(Finding(
                 tipo="interaccion" if interaction else "informacion",
