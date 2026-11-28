@@ -1,40 +1,57 @@
-"""Run the real checks for the screen (Person 5).
+"""Coordinate the checks behind a medication review.
 
-Two entry points, one per tab:
+Entry points:
 
-* ``review_patient``: checks every medicine a patient already takes.
-* ``check_new_medicine``: checks a proposed medicine against the patient's
-  current medicines, before it is prescribed.
+* ``review_patient`` checks every pair of medicines a patient currently takes.
+* ``check_new_medicine`` checks a proposed medicine against the patient's
+  current medicines, retaining only findings involving the proposed medicine.
+* ``review_request`` accepts the patient sheet and an optional question. Blank
+  questions use the standard review; other questions receive a focused answer
+  grounded in CIMA evidence and the shared rule results.
 
-Both use whatever parts of the system are available, and say which parts were
-not checked, so the report never shows "None found" for something nobody looked
-at:
+Both combine the available parts of the system:
 
-1. **Rules (Person 2, ``src/reglas.py``):** duplicates (shared active-ingredient
-   code), same drug family (ATC) and prescribing cascades. They need
-   ``data/processed/prescriptions.json`` for the nomenclator codes. Without it
-   (for example on the shared link) they use the ATC codes and ingredient
-   names in ``data/catalogo_medicamentos.json``. If ``src/reglas.py`` cannot be
-   loaded, duplicates fall back to a name comparison and drug families and
-   cascades are marked "not checked".
-2. **Model (Person 3, ``src.rag.review_interaction``):** for each pair of
-   medicines, each technical sheet is searched for the other medicine's active
-   ingredient (both directions). It needs the search index and GROQ_API_KEY.
-   Without them, the screen uses **stored answers** when
-   ``data/interacciones_guardadas.json`` exists: the same questions, asked once
-   on a computer with the model by ``python -m src.guardar_interacciones``.
-   With neither, interactions are marked "not checked".
+1. **Deterministic rules (``src/Cascades/reglas.py``):** identify duplicate
+   active ingredients, medicines in the same ATC family and possible prescribing
+   cascades. These checks need ``data/processed/prescriptions.json`` and the
+   cascade table. Without rule data, duplicates fall back to ingredient-name
+   comparison using ``data/catalogo_medicamentos.json``; ATC-family and cascade
+   checks are marked "not checked".
+2. **RAG (``src/Rag/rag.py``):** search each medicine's technical sheet for the
+   other medicine's active ingredients, in both directions where sheets are
+   available. This needs the search index, model libraries and ``GROQ_API_KEY``.
+   When disabled, interaction checks are marked "not checked".
 
-Each model answer becomes one of three things, kept apart on purpose:
+This module plans the checks and adapts their results for reporting. The shared
+rules module performs rule matching; the RAG pipeline retrieves evidence,
+generates responses and verifies their citations.
 
-* ``found``: a Finding with the verified quotation from the technical sheet.
-* ``not_found``: "searched, nothing found", listed separately. This does not
-  mean the combination is safe.
-* ``rejected`` / ``error`` / an exception: "could not be checked". Never shown
-  as "nothing found"; the pair needs manual review.
+RAG outcomes remain distinct:
 
-The system informs; the prescriber decides. Nothing here says whether a
-medicine can or cannot be prescribed.
+* ``found`` means relevant evidence was found. ``interaction_detected`` decides
+  whether it becomes a potential-interaction alert or documented information
+  without an alert. All verified citations are retained.
+* ``not_found`` means the search produced no relevant evidence. It does not
+  establish that the combination is safe.
+* ``rejected``, ``error`` or an exception means the check could not be completed.
+  These outcomes are never reported as "nothing found".
+
+Imports for optional components stay at their points of use, allowing
+rules-only reviews without the RAG libraries, index or API key.
+The system informs; the clinician decides.
+
+``MAIN.ipynb`` at the repository root is the interactive runner for these
+production functions. Scenario selection, patient overrides and execution
+switches are caller inputs; the notebook passes the resolved Patient and
+question to ``review_request``. It does not implement a separate review engine.
+That entry point already forwards optional ``k`` and ``generation_options``
+through patient-question planning, pair checks and the final grounded answer.
+
+For a standalone question without a patient, callers use
+``src.Rag.rag.answer_question(question, nregistro=None, sections=None, ...)``.
+The notebook splits that same operation into preparation and generation so
+the retrieved evidence and exact prompt can be inspected before a model call.
+The website exposes standalone questions separately; ``review_request`` requires a Patient.
 """
 from __future__ import annotations
 
@@ -42,14 +59,15 @@ import json
 import os
 import time
 from dataclasses import dataclass, field
+from functools import partial
 from datetime import date
 from itertools import combinations
 from pathlib import Path
 from typing import Callable
 
 from src.config import DATA_DIR, DATABASE_DIR, PRESCRIPTIONS_FILE
-from src.informe import normalise_text
-from src.modelos import Citation, Finding, Medication, Patient
+from src.Rag.verificacion import Citation
+from src.Reports.informe import Finding, Medication, Patient, normalise_text
 
 CATALOGUE_FILE = DATA_DIR / "catalogo_medicamentos.json"
 STORED_ANSWERS_FILE = DATA_DIR / "interacciones_guardadas.json"
@@ -59,6 +77,8 @@ REASON_TEXT = {
     "invalid_citation": "the model's answer quoted text that could not be verified",
     "invalid_response": "the model's answer was not in the expected format",
     "generation_failed": "the model could not be reached",
+    "context_too_large": "the evidence exceeds the model request-size limit",
+    "legacy_unclassified": "the historical answer requires updated interaction classification",
     "not_stored": "this search is not in the stored model answers",
 }
 
@@ -67,6 +87,8 @@ Progress = Callable[[int, int, str], None]
 
 @dataclass
 class CatalogueEntry:
+    """Medicine metadata used to plan interaction searches."""
+
     nregistro: str
     nombre: str
     principios_activos: list[str]
@@ -76,13 +98,28 @@ class CatalogueEntry:
 
 @dataclass
 class CheckResult:
+    """Findings, coverage limitations and the audit log for one review."""
+
     findings: list[Finding] = field(default_factory=list)
     checked_without_evidence: list[str] = field(default_factory=list)
     could_not_check: list[str] = field(default_factory=list)
-    # Finding types that were not looked for at all (shown as "Not checked").
+    # Finding categories that could not be checked.
     unchecked: set[str] = field(default_factory=set)
-    # One entry per model question, for the evaluation (deliverable 5).
+    # One audit entry per RAG request, including failures.
     log: list[dict] = field(default_factory=list)
+
+
+@dataclass
+class QuestionResult:
+    """A standard review or a focused answer with its supporting checks."""
+
+    checks: CheckResult
+    question: str = ""
+    proposed: Medication | None = None
+    answer: str | None = None
+    citations: list[Citation] = field(default_factory=list)
+    supporting_findings: list[Finding] = field(default_factory=list)
+    clarification: str | None = None
 
 
 # --------------------------------------------------------------------------
@@ -104,31 +141,25 @@ def load_catalogue(path: str | Path = CATALOGUE_FILE) -> dict[str, CatalogueEntr
     }
 
 
-def _import_rag():
-    from src import rag  # needs groq, chromadb and sentence-transformers
-
-    return rag
-
-
-def _import_rules():
-    from src import reglas
-
-    return reglas
-
-
 def model_status(database_dir: Path = DATABASE_DIR) -> tuple[bool, str]:
     """Return (ready, explanation) for the model, without calling it."""
     try:
-        _import_rag()
+        from src.Rag import rag  # Import only; do not load the index or call the API.
     except ImportError as exc:
         return False, (
             f"the model's libraries are not installed here ({exc.name}). "
             "Install the full requirements.txt."
         )
+    from importlib.util import find_spec
+
+    for package in ("chromadb", "sentence_transformers", "torch"):
+        if find_spec(package) is None:
+            return False, f"Required package missing: {package}."
+
     if not Path(database_dir).exists():
         return False, (
             "the search index is missing. Put the shared CIMA file in data/processed/ "
-            "and run src/indice.py."
+            "and run python -m src.Rag.indice."
         )
     key = os.getenv("GROQ_API_KEY")
     if not key or key == "your_groq_api_key_here":
@@ -137,11 +168,11 @@ def model_status(database_dir: Path = DATABASE_DIR) -> tuple[bool, str]:
 
 
 def rules_status(prescriptions_file: Path = PRESCRIPTIONS_FILE) -> tuple[bool, str]:
-    """Return (ready, explanation) for Person 2's rules."""
+    """Check rule-module availability and the required nomenclator file."""
     try:
-        _import_rules()
-    except Exception as exc:  # a SyntaxError or ImportError inside src/reglas.py
-        return False, f"src/reglas.py could not be loaded ({type(exc).__name__}: {exc})."
+        from src.Cascades import reglas
+    except Exception as exc:  # a SyntaxError or ImportError inside src/Cascades/reglas.py
+        return False, f"src/Cascades/reglas.py could not be loaded ({type(exc).__name__}: {exc})."
     if not Path(prescriptions_file).exists():
         return True, (
             "connected, using the ATC codes in the medicine list "
@@ -160,7 +191,7 @@ def load_rule_data(
     medicine list: its ATC codes, and its ingredient names in place of the
     nomenclator ingredient codes (the rules only compare them for equality).
     """
-    reglas = _import_rules()
+    from src.Cascades import reglas
     if Path(prescriptions_file).exists():
         drug_info = reglas.load_drug_info(Path(prescriptions_file))
     else:
@@ -201,8 +232,18 @@ def stored_review(stored: StoredAnswers) -> Callable[[str, str], dict]:
         answer = stored.answers.get((nregistro, normalise_text(ingredient)))
         if answer is None:
             return {"status": "error", "reason": "not_stored", "response": None}
+        response = answer.get("response")
+        if answer["status"] == "found" and (
+            not isinstance(response, dict)
+            or type(response.get("interaction_detected")) is not bool
+        ):
+            return {
+                "status": "error",
+                "reason": "legacy_unclassified",
+                "response": None,
+            }
         return {"status": answer["status"], "reason": answer.get("reason"),
-                "response": answer.get("response")}
+                "response": response}
     return review
 
 
@@ -275,6 +316,192 @@ def save_answers(
 
 
 # --------------------------------------------------------------------------
+# Public review API
+# --------------------------------------------------------------------------
+
+def check_new_medicine(
+    patient: Patient,
+    proposed: Medication,
+    catalogue: dict[str, CatalogueEntry],
+    *,
+    rule_data: tuple[dict, dict] | None = None,
+    use_model: bool = True,
+    review: Callable[[str, str], dict] | None = None,
+    progress: Progress | None = None,
+) -> CheckResult:
+    """Check ``proposed`` against every medicine in ``patient``.
+
+    ``rule_data`` comes from ``load_rule_data()``; without it the rules part
+    falls back to a name comparison. ``review`` defaults to
+    ``src.Rag.rag.review_interaction``; tests pass a stand-in.
+    """
+    if proposed.nregistro not in catalogue:
+        raise ValueError(f"{proposed.nombre} is not in the medicine list.")
+    medications = list(patient.medicamentos) + [proposed]
+    pairs = [(proposed, current) for current in patient.medicamentos]
+    return _run(medications, pairs, catalogue, proposed_index=len(medications) - 1,
+                rule_data=rule_data, use_model=use_model, review=review, progress=progress)
+
+
+def review_patient(
+    patient: Patient,
+    catalogue: dict[str, CatalogueEntry],
+    *,
+    rule_data: tuple[dict, dict] | None = None,
+    use_model: bool = False,
+    review: Callable[[str, str], dict] | None = None,
+    progress: Progress | None = None,
+) -> CheckResult:
+    """Check every pair of the patient's current medicines."""
+    medications = list(patient.medicamentos)
+    pairs = list(combinations(medications, 2))
+    return _run(medications, pairs, catalogue, proposed_index=None,
+                rule_data=rule_data, use_model=use_model, review=review, progress=progress)
+
+
+def planned_questions(patient: Patient, proposed: Medication | None, catalogue: dict[str, CatalogueEntry]) -> int:
+    """How many model questions a check or review will ask (to warn about time)."""
+    meds = list(patient.medicamentos)
+    pairs = [(proposed, m) for m in meds] if proposed is not None else list(combinations(meds, 2))
+    return len(_interaction_plan(pairs, catalogue, CheckResult()))
+
+
+def review_request(
+    patient: Patient,
+    catalogue: dict[str, CatalogueEntry],
+    question: str | None = None,
+    *,
+    rule_data: tuple[dict, dict] | None = None,
+    use_model: bool = False,
+    review: Callable[[str, str], dict] | None = None,
+    progress: Progress | None = None,
+    k: int | None = None,
+    generation_options: dict | None = None,
+) -> QuestionResult:
+    """Review the patient sheet, optionally answering a doctor's question.
+
+    A blank question follows the existing review exactly, without a planning
+    or synthesis call. A nonempty question is resolved against the catalogue;
+    ambiguous medicines require clarification rather than a guessed product.
+    Optional k and generation_options apply to the searches and answers in
+    this request; omitted values retain the project's defaults.
+    """
+    if k is not None and k < 1:
+        raise ValueError("k must be at least 1.")
+    rag_options = {}
+    if k is not None:
+        rag_options["k"] = k
+    if generation_options:
+        rag_options["generation_options"] = generation_options
+    if use_model and review is None and rag_options:
+        from src.Rag.rag import review_interaction
+
+        review = partial(review_interaction, **rag_options)
+    question = (question or "").strip()
+    unknown = {medicine.nregistro for medicine in patient.medicamentos} - catalogue.keys()
+    if unknown:
+        return QuestionResult(
+            checks=CheckResult(), question=question,
+            clarification="These patient medicines are not in the supported catalogue: "
+                          + ", ".join(sorted(unknown)) + ". Their identity must be resolved before review.",
+        )
+    if not question:
+        return QuestionResult(checks=review_patient(
+            patient, catalogue, rule_data=rule_data, use_model=use_model,
+            review=review, progress=progress,
+        ))
+    result = QuestionResult(checks=CheckResult(), question=question)
+    if not use_model:
+        result.clarification = (
+            "Question answering is unavailable because the model is not connected. "
+            "Leave the question empty to run the available standard checks."
+        )
+        return result
+
+    from src.llm import llm_prepare_question
+    from src.Rag.rag import answer_patient_question
+
+    if progress:
+        progress(0, 1, "Understanding the question")
+    try:
+        plan = llm_prepare_question(
+            question, patient.model_dump(mode="json"),
+            [{"nregistro": entry.nregistro, "nombre": entry.nombre,
+              "principios_activos": entry.principios_activos} for entry in catalogue.values()],
+            **(generation_options or {}),
+        )
+    except Exception as exc:
+        result.clarification = "The question could not be interpreted. Try again or leave it empty for a standard review."
+        result.checks.could_not_check.append(f"Question interpretation failed ({type(exc).__name__}).")
+        return result
+    if plan.intent == "clarify":
+        result.clarification = plan.clarification or "Which medicine or patient detail do you mean?"
+        return result
+    requested = set(plan.medicine_ids)
+    if plan.intent == "new_medicine":
+        if not plan.proposed_nregistro:
+            result.clarification = "Which specific medicine are you considering adding?"
+            return result
+        requested.add(plan.proposed_nregistro)
+    if requested - catalogue.keys():
+        result.clarification = "The medicine could not be matched to the available catalogue. Please specify the product."
+        return result
+
+    if plan.intent == "new_medicine":
+        entry = catalogue[plan.proposed_nregistro]
+        result.proposed = Medication(nregistro=entry.nregistro, nombre=entry.nombre,
+                                     dosis="Not specified", prescriptor="Not specified")
+        result.checks = check_new_medicine(
+            patient, result.proposed, catalogue, rule_data=rule_data,
+            use_model=True, review=review, progress=progress,
+        )
+    else:
+        result.checks = review_patient(
+            patient, catalogue, rule_data=rule_data,
+            use_model=True, review=review, progress=progress,
+        )
+
+    scope = list(plan.medicine_ids)
+    if result.proposed or not scope:
+        scope += [medicine.nregistro for medicine in patient.medicamentos]
+    if result.proposed:
+        scope.append(result.proposed.nregistro)
+    limitations = result.checks.could_not_check + [
+        f"Not checked: {kind}" for kind in sorted(result.checks.unchecked)
+    ] + [f"No evidence found: {item}" for item in result.checks.checked_without_evidence]
+    if progress:
+        progress(0, 1, "Answering the question from the available evidence")
+    patient_context = patient.model_dump(mode="json")
+    if result.proposed:
+        patient_context["proposed_medicine"] = result.proposed.model_dump(mode="json")
+    try:
+        answer = answer_patient_question(
+            question, plan.search_question, patient_context, scope,
+            [finding.model_dump(mode="json") for finding in result.checks.findings], limitations,
+            **rag_options,
+        )
+    except Exception as exc:
+        result.checks.could_not_check.append(f"Question search failed ({type(exc).__name__}).")
+        answer = {"status": "error", "reason": "generation_failed", "response": None}
+    result.checks.log.append({"question": question, "status": answer["status"], "reason": answer["reason"]})
+    response = answer.get("response")
+    if response is not None:
+        result.answer = response["answer"]
+        result.citations = [Citation.model_validate(item) for item in response["citations"]]
+        result.supporting_findings = [
+            finding for i, finding in enumerate(result.checks.findings, 1)
+            if f"F{i}" in response["finding_ids"]
+        ]
+    else:
+        reason = REASON_TEXT.get(answer["reason"], "the answer could not be verified",)
+        result.answer = f"The question could not be answered: {reason}. See the available checks below."
+        result.checks.could_not_check.append(f"Question answer: {reason}.")
+    if progress:
+        progress(1, 1, "Done")
+    return result
+
+
+# --------------------------------------------------------------------------
 # Rules
 # --------------------------------------------------------------------------
 
@@ -288,41 +515,41 @@ def _join(items: list[str]) -> str:
 def _rule_findings(
     medications: list[Medication], rule_data: tuple[dict, dict], proposed: int | None, result: CheckResult
 ) -> None:
-    """Run Person 2's rules. With ``proposed`` (an index into ``medications``),
-    keep only the findings that involve that medicine."""
-    reglas = _import_rules()
+    """Adapt shared rule results to report findings.
+
+    When checking a proposed medicine, retain only findings involving it.
+    Missing registrations are reported and excluded before rule execution.
+    """
+    from src.Cascades import reglas
     drug_info, cascade_table = rule_data
-    rule_meds, keep = [], None
+    available = []
+    proposed_position = None
     for i, med in enumerate(medications):
-        info = drug_info.get(med.nregistro)
-        if info is None:
+        if med.nregistro not in drug_info:
             result.could_not_check.append(
                 f"{med.nombre}: not found in the nomenclator data, so it was left out of the "
                 "duplicate, drug-family and cascade checks."
             )
             continue
-        rule_med = reglas.Medication(
-            nregistro=med.nregistro, name=med.nombre, prescriber=med.prescriptor,
-            atc=list(info["atc"]), active_ingredients=list(info["active_ingredients"]),
-        )
-        rule_meds.append(rule_med)
         if i == proposed:
-            keep = rule_med
+            proposed_position = len(available)
+        available.append(med.model_dump())
+
+    rule_meds = reglas.build_medications({"medicamentos": available}, drug_info)
+    keep = rule_meds[proposed_position] if proposed_position is not None else None
     if proposed is not None and keep is None:
         return  # the proposed medicine has no codes; already noted above
 
     def involved(*meds) -> bool:
         return keep is None or any(m is keep for m in meds)
 
-    def other(a, b):
-        return b if a is keep else a
-
     for d in reglas.find_duplicates(rule_meds):
         a, b = d.medication_a, d.medication_b
         if not involved(a, b):
             continue
+        other = b if a is keep else a
         question = (
-            f"The patient already takes {other(a, b).name}. What total daily amount of the "
+            f"The patient already takes {other.name}. What total daily amount of the "
             "shared active ingredient would the patient take with both?"
             if keep else
             f"Is the patient taking both {a.name} and {b.name}, and what total daily amount "
@@ -368,7 +595,10 @@ def _name_duplicates(
     pairs: list[tuple[Medication, Medication]], catalogue: dict[str, CatalogueEntry],
     proposed: Medication | None, result: CheckResult,
 ) -> None:
-    """Fallback when the rules are not available: compare ingredient names."""
+    """Provide a name-based duplicate check when nomenclator codes are unavailable.
+
+    This fallback does not attempt ATC-family or cascade matching.
+    """
     for x, y in pairs:
         ex, ey = catalogue.get(x.nregistro), catalogue.get(y.nregistro)
         if ex is None or ey is None:
@@ -405,7 +635,7 @@ def _name_duplicates(
 
 
 # --------------------------------------------------------------------------
-# Model
+# RAG request planning and result handling
 # --------------------------------------------------------------------------
 
 def _interaction_plan(
@@ -422,8 +652,19 @@ def _interaction_plan(
                 if note not in result.could_not_check:
                     result.could_not_check.append(note)
             continue
-        if {normalise_text(i) for i in ex.principios_activos} & {normalise_text(i) for i in ey.principios_activos}:
-            continue  # same ingredient: a duplicate, not an interaction question
+        # Identical single-ingredient medicines are handled
+        # by duplicate detection, not drug-pair interaction checks.
+        ingredients_x = {
+            ing.strip().casefold() for ing in ex.principios_activos
+        }
+        ingredients_y = {
+            ing.strip().casefold() for ing in ey.principios_activos
+        }
+
+        if len(ingredients_x) == 1 and ingredients_x == ingredients_y:
+            continue
+        # Duplicate detection and evidence retrieval are separate checks.
+        # Shared ingredients must not hide interactions in combination products.
         if ex.ficha:
             plan += [(ex, ing, x, y) for ing in ey.principios_activos]
         if ey.ficha:
@@ -446,13 +687,23 @@ def _ask_model(
     result: CheckResult,
     progress: Progress | None,
 ) -> None:
+    """Convert RAG outcomes to report results without reinterpreting evidence."""
+    request_cache = {}
     total = len(plan)
     for done, (sheet, ingredient, x, y) in enumerate(plan):
         label = f"{sheet.nombre} sheet, searched for {ingredient}"
         if progress:
             progress(done, total, f"Searching the {sheet.nombre} sheet for {ingredient}")
         try:
-            answer = review(sheet.nregistro, ingredient)
+            cache_key = (sheet.nregistro, ingredient)
+
+            if cache_key in request_cache:
+                answer = request_cache[cache_key]
+            else:
+                answer = review(sheet.nregistro, ingredient)
+
+                if answer.get("status") in {"found", "not_found"}:
+                    request_cache[cache_key] = answer
         except Exception as exc:  # index or search failure: never "nothing found"
             result.log.append({"sheet": sheet.nregistro, "ingredient": ingredient,
                                "status": "exception", "reason": type(exc).__name__})
@@ -465,18 +716,23 @@ def _ask_model(
         if status == "found":
             response = answer.get("response") or {}
             citations = response.get("citations") or []
-            if not citations:  # the pipeline should not allow this; be safe anyway
+            if not citations:  # A found response must include supporting evidence.
                 result.could_not_check.append(f"{label}: the answer had no quotation.")
+                continue
+            interaction = response.get("interaction_detected")
+            if interaction is not True and interaction is not False:
+                result.could_not_check.append(f"{label}: {REASON_TEXT['invalid_response']}.")
                 continue
             who = _join([y.prescriptor, x.prescriptor if x.prescriptor != "Not specified" else ""])
             result.findings.append(Finding(
-                tipo="interaccion",
+                tipo="interaccion" if interaction else "informacion",
                 descripcion=response.get("description") or "Information found in the technical sheet.",
                 cita=Citation.model_validate(citations[0]),
+                citations=[Citation.model_validate(citation) for citation in citations],
                 pregunta_medico=(
                     f"Have the prescribers involved ({who}) reviewed the combined use of "
                     f"{x.nombre} and {y.nombre}?"
-                ),
+                ) if interaction else None,
             ))
         elif status == "not_found":
             result.checked_without_evidence.append(label)
@@ -488,7 +744,7 @@ def _ask_model(
 
 
 # --------------------------------------------------------------------------
-# Entry points
+# Shared execution flow
 # --------------------------------------------------------------------------
 
 def _run(
@@ -502,6 +758,7 @@ def _run(
     review: Callable[[str, str], dict] | None,
     progress: Progress | None,
 ) -> CheckResult:
+    """Run rule checks, then the planned RAG requests, without changing their logic."""
     result = CheckResult()
     if rule_data is not None:
         _rule_findings(medications, rule_data, proposed_index, result)
@@ -512,55 +769,10 @@ def _run(
 
     if use_model:
         if review is None:
-            review = _import_rag().review_interaction
+            from src.Rag.rag import review_interaction
+
+            review = review_interaction
         _ask_model(_interaction_plan(pairs, catalogue, result), review, result, progress)
     else:
         result.unchecked.add("interaccion")
     return result
-
-
-def check_new_medicine(
-    patient: Patient,
-    proposed: Medication,
-    catalogue: dict[str, CatalogueEntry],
-    *,
-    rule_data: tuple[dict, dict] | None = None,
-    use_model: bool = True,
-    review: Callable[[str, str], dict] | None = None,
-    progress: Progress | None = None,
-) -> CheckResult:
-    """Check ``proposed`` against every medicine in ``patient``.
-
-    ``rule_data`` comes from ``load_rule_data()``; without it the rules part
-    falls back to a name comparison. ``review`` defaults to
-    ``src.rag.review_interaction``; tests pass a stand-in.
-    """
-    if proposed.nregistro not in catalogue:
-        raise ValueError(f"{proposed.nombre} is not in the medicine list.")
-    medications = list(patient.medicamentos) + [proposed]
-    pairs = [(proposed, current) for current in patient.medicamentos]
-    return _run(medications, pairs, catalogue, proposed_index=len(medications) - 1,
-                rule_data=rule_data, use_model=use_model, review=review, progress=progress)
-
-
-def review_patient(
-    patient: Patient,
-    catalogue: dict[str, CatalogueEntry],
-    *,
-    rule_data: tuple[dict, dict] | None = None,
-    use_model: bool = False,
-    review: Callable[[str, str], dict] | None = None,
-    progress: Progress | None = None,
-) -> CheckResult:
-    """Check every pair of the patient's current medicines."""
-    medications = list(patient.medicamentos)
-    pairs = list(combinations(medications, 2))
-    return _run(medications, pairs, catalogue, proposed_index=None,
-                rule_data=rule_data, use_model=use_model, review=review, progress=progress)
-
-
-def planned_questions(patient: Patient, proposed: Medication | None, catalogue: dict[str, CatalogueEntry]) -> int:
-    """How many model questions a check or review will ask (to warn about time)."""
-    meds = list(patient.medicamentos)
-    pairs = [(proposed, m) for m in meds] if proposed is not None else list(combinations(meds, 2))
-    return len(_interaction_plan(pairs, catalogue, CheckResult()))

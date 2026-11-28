@@ -1,4 +1,4 @@
-﻿"""Evaluation of the Medication Review AI against the labelled patients.
+"""Evaluation of the Medication Review AI against the labelled patients.
 
 WHY THIS FILE EXISTS
 --------------------
@@ -67,8 +67,8 @@ if str(ROOT) not in sys.path:
 # not find the "src" package. "noqa: E402" tells the code checker that the late
 # position is on purpose.
 from src.config import FORBIDDEN_PHRASES  # noqa: E402  (the 10 banned phrases)
-from src.modelos import Patient  # noqa: E402  (the validated patient model)
-from src.revision import (  # noqa: E402  (the review code the app itself uses)
+from src.Reports.informe import Patient  # noqa: E402  (the validated patient model)
+from src.main import (  # noqa: E402  (the review code the app itself uses)
     load_catalogue,  # reads data/catalogo_medicamentos.json
     load_rule_data,  # builds the ATC and ingredient codes the rules need
     load_stored_answers,  # reads data/interacciones_guardadas.json
@@ -144,7 +144,7 @@ def observed(raw: dict, patient: Patient, catalogue, rule_data, review) -> dict:
     can be compared with the expected result."""
     # Imported here, not at the top, so a problem inside reglas.py only breaks
     # the evaluation when it is actually run.
-    import src.reglas as reglas
+    from src.Cascades import reglas
 
     # rule_data is a pair: the ATC/ingredient codes per medicine, and the table
     # of the 13 hand-curated cascades. We split it into two names.

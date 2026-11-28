@@ -1,13 +1,9 @@
-
-"""Tests for the shared RAG response data model."""
-
-import json
+"""Validate the LLM response schema without making API calls."""
 
 import pytest
 from pydantic import ValidationError
 
-from src.config import CASCADES_FILE
-from src.modelos import CascadeCase, CascadeMedication, StructuredOutputRAG
+from src.llm import StructuredOutputRAG
 
 
 def test_valid_rag_response():
@@ -84,26 +80,21 @@ def test_not_found_with_citations():
         })
 
 
-def test_shared_cascade_data():
-    """The real shared file must load, validate, and have unique rule IDs."""
-    entries = json.loads(CASCADES_FILE.read_text(encoding="utf-8"))
-    assert entries
-    cascades = [CascadeCase.model_validate(entry) for entry in entries]
-    ids = [cascade.id for cascade in cascades]
-    assert len(ids) == len(set(ids))
-
-
-@pytest.mark.parametrize("codes", [
-    {"cod_principio_activo": ["2765"]},
-    {"cod_atc": ["M01A"]},
-    {"cod_principio_activo": ["2765"], "cod_atc": ["M01AE01"]},
-])
-def test_cascade_code_options(codes):
-    """Accept either type of identifier and combinations of both."""
-    CascadeMedication(nombre="Ibuprofeno", **codes)
-
-
-def test_cascade_requires_matching_codes():
-    """A medicine name alone is not a usable deterministic rule."""
+@pytest.mark.parametrize("value", ["false", "true", 0, 1])
+def test_interaction_classification_requires_a_boolean(value):
     with pytest.raises(ValidationError):
-        CascadeMedication(nombre="Ibuprofeno")
+        StructuredOutputRAG.model_validate({
+            "status": "found", "description": "Synthetic evidence.",
+            "interaction_detected": value,
+            "citations": [{"nregistro": "123", "seccion": "4.5",
+                           "literal_quote": "Synthetic supporting quotation for this schema test"}],
+        })
+
+
+@pytest.mark.parametrize("value", [True, False])
+def test_interaction_classification_requires_evidence(value):
+    with pytest.raises(ValidationError):
+        StructuredOutputRAG.model_validate({
+            "status": "not_found", "description": "No evidence.",
+            "citations": [], "interaction_detected": value,
+        })

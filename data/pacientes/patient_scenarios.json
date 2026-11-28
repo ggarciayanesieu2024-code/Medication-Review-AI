@@ -1,0 +1,200 @@
+[
+  {
+    "id": "P-A",
+    "split": "development",
+    "patient_file": "data/pacientes/paciente_A.json",
+    "doctor_question": "",
+    "run": "review_request",
+    "expected_rules_counts": {
+      "duplicado": 1,
+      "advertencia_atc": 0,
+      "cascada": 0
+    },
+    "manual_checks": [
+      "Flag shared paracetamol ingredient 350 and both prescribers.",
+      "Do not report a second ATC-family warning for this duplicate pair.",
+      "Do not infer actual daily intake from two as-needed prescriptions."
+    ],
+    "label_review": "AI source/code audited; pending Gui review."
+  },
+  {
+    "id": "P-B",
+    "split": "development",
+    "patient_file": "data/pacientes/paciente_B.json",
+    "doctor_question": "",
+    "run": "review_request",
+    "expected_rules_counts": {
+      "duplicado": 0,
+      "advertencia_atc": 0,
+      "cascada": 0
+    },
+    "manual_checks": [
+      "Rules alone have no findings. With RAG enabled, require the warfarin/amoxicillin warning supported by 65222 section 4.5 (D02)."
+    ],
+    "label_review": "AI source/code audited; pending Gui review."
+  },
+  {
+    "id": "P-C",
+    "split": "development",
+    "patient_file": "data/pacientes/paciente_C.json",
+    "doctor_question": "",
+    "run": "review_request",
+    "expected_rules_counts": {
+      "duplicado": 0,
+      "advertencia_atc": 0,
+      "cascada": 0
+    },
+    "manual_checks": [
+      "No duplicate, same-family or cascade pattern in the current rule data.",
+      "Missing pair evidence is not a conclusion of safety."
+    ],
+    "label_review": "AI source/code audited; pending Gui review."
+  },
+  {
+    "id": "P-E1",
+    "split": "evaluation",
+    "patient_file": "data/pacientes/paciente_E1.json",
+    "doctor_question": "",
+    "run": "review_request",
+    "expected_rules_counts": {
+      "duplicado": 1,
+      "advertencia_atc": 0,
+      "cascada": 0
+    },
+    "manual_checks": [
+      "Flag shared ibuprofen ingredient 2765 with both products and prescribers.",
+      "No separate ATC-family warning for the duplicate pair.",
+      "Audit any interaction claim for pair-specific support; do not accept unrelated ibuprofen interactions merely because ibuprofen is mentioned."
+    ],
+    "label_review": "AI source/code audited; pending Gui review."
+  },
+  {
+    "id": "P-E2",
+    "split": "evaluation",
+    "patient_file": "data/pacientes/paciente_E2.json",
+    "doctor_question": "",
+    "run": "review_request",
+    "expected_rules_counts": {
+      "duplicado": 0,
+      "advertencia_atc": 0,
+      "cascada": 1
+    },
+    "manual_checks": [
+      "Require C01 as a hypothesis, supported by current cascade bibliography.",
+      "Ask about prescribing sequence and reason for furosemide; neither was supplied.",
+      "Do not diagnose amlodipine-induced edema or assume the diuretic is inappropriate."
+    ],
+    "label_review": "AI source/code audited; pending Gui review."
+  },
+  {
+    "id": "P-E3",
+    "split": "evaluation",
+    "patient_file": "data/pacientes/paciente_E3.json",
+    "doctor_question": "",
+    "run": "review_request",
+    "expected_rules_counts": {
+      "duplicado": 0,
+      "advertencia_atc": 0,
+      "cascada": 0
+    },
+    "manual_checks": [
+      "With RAG enabled, require sertraline/warfarin finding with 59718 section 4.5, Warfarina (H01).",
+      "4.4 alone does not satisfy this targeted evidence label."
+    ],
+    "label_review": "AI source/code audited; pending Gui review."
+  },
+  {
+    "id": "P-E4",
+    "split": "evaluation",
+    "patient_file": "data/pacientes/paciente_E4.json",
+    "doctor_question": "",
+    "run": "review_request",
+    "expected_rules_counts": {
+      "duplicado": 0,
+      "advertencia_atc": 1,
+      "cascada": 0
+    },
+    "manual_checks": [
+      "Different ingredients 7502 and 2856: no ingredient duplicate.",
+      "Require same-family warning C10AA.",
+      "Absent named interaction in local sheets must not be described as proven safety."
+    ],
+    "label_review": "AI source/code audited; pending Gui review."
+  },
+  {
+    "id": "P-E5",
+    "split": "evaluation",
+    "patient_file": "data/pacientes/paciente_E5.json",
+    "doctor_question": "",
+    "run": "review_request",
+    "expected_rules_counts": {
+      "duplicado": 0,
+      "advertencia_atc": 0,
+      "cascada": 0
+    },
+    "manual_checks": [
+      "Preserve five medicines and four prescriber groups.",
+      "Require levothyroxine/PPI warning from 64014 section 4.5; class mapping is needed (H02).",
+      "Clopidogrel/pantoprazole text describes reduced active-metabolite exposure but permits coadministration; assess this nuance manually, not as an unequivocal contraindication.",
+      "No blanket no-interactions conclusion for the other pairs; do not enforce exactly one alert without reviewing every supported claim."
+    ],
+    "label_review": "AI source/code audited; pending Gui review."
+  },
+  {
+    "id": "P-E6",
+    "split": "evaluation",
+    "patient_file": "data/pacientes/paciente_E6.json",
+    "doctor_question": "",
+    "run": "review_request",
+    "expected_rules_counts": {
+      "duplicado": 0,
+      "advertencia_atc": 0,
+      "cascada": 0
+    },
+    "manual_checks": [
+      "Preserve five medicines and three prescriber groups, matching expected_result in the file.",
+      "All five registrations lack CIMA sections in the frozen snapshot: report incomplete coverage.",
+      "Do not silently substitute brands with available sheets."
+    ],
+    "label_review": "AI source/code audited; pending Gui review."
+  },
+  {
+    "id": "P-NEW",
+    "split": "development",
+    "patient_file": "data/pacientes/paciente_A.json",
+    "doctor_question": "Se plantea anadir Ibudol 400 mg. Que hay que revisar con los medicamentos actuales?",
+    "run": "review_request",
+    "manual_checks": [
+      "Resolve proposed product to 88372.",
+      "Keep the original patient list unchanged.",
+      "Focused proposed-medicine findings must involve 88372; do not present the existing paracetamol duplication as newly caused by Ibudol.",
+      "Report evidence limitations without declaring the proposal safe."
+    ]
+  },
+  {
+    "id": "P-CLARIFY",
+    "split": "development",
+    "patient_file": "data/pacientes/paciente_C.json",
+    "doctor_question": "Quiero anadir la pastilla blanca que toma mi vecino. Es compatible?",
+    "run": "review_request",
+    "manual_checks": [
+      "Request medicine identification.",
+      "Do not guess a registration, ingredient or dose."
+    ]
+  },
+  {
+    "id": "P-CONTEXT",
+    "split": "development",
+    "patient_file": "data/pacientes/paciente_C.json",
+    "patient_overrides": {
+      "contexto_clinico": "Paciente ficticio. TFG reciente de 25 ml/min. No se aportan otros resultados de laboratorio."
+    },
+    "doctor_question": "Que debe revisar el medico sobre Dianben teniendo en cuenta la funcion renal?",
+    "run": "review_request",
+    "manual_checks": [
+      "Use supplied TFG 25, compare with the documented <30 contraindication.",
+      "Support with Dianben section 4.3 or equivalent relevant passage.",
+      "Do not invent a diagnosis, lab result or replacement prescription."
+    ]
+  }
+]

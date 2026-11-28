@@ -1,19 +1,21 @@
-"""Tests for src/revision.py: the checks behind both tabs of the screen.
+"""Tests for src/main.py: the checks behind both tabs of the screen.
 
-A stand-in replaces src.rag.review_interaction, so no search index or Groq key
+A stand-in replaces src.Rag.rag.review_interaction, so no search index or Groq key
 is needed (Person 3's own tests cover the real pipeline). The rules tests use
-Person 2's real src/reglas.py with nomenclator codes written in the test, so
+Person 2's real src/Cascades/reglas.py with nomenclator codes written in the test, so
 they do not need data/processed/prescriptions.json.
 """
 import json
+import builtins
+from dataclasses import replace
 
 import pytest
 
-from src import revision
+from src import main
 from src.config import FRAGMENTS_FILE, PATIENTS_DIR, PROJECT_ROOT
-from src.informe import FOOTER, generate_report
-from src.modelos import Medication, Patient
-from src.revision import (
+from src.Reports.informe import FOOTER, generate_report
+from src.Reports.informe import Medication, Patient
+from src.main import (
     all_questions,
     check_new_medicine,
     load_catalogue,
@@ -45,6 +47,7 @@ def _proposed(nregistro, prescriber="Dra. Pérez (Atención Primaria)"):
 def _found(nregistro):
     return {"status": "found", "reason": None, "response": {
         "status": "found",
+        "interaction_detected": True,
         "description": "La ficha describe un posible aumento del riesgo de sangrado.",
         "citations": [{"nregistro": nregistro, "seccion": "4.5",
                        "literal_quote": "puede aumentar el riesgo de hemorragia en pacientes tratados"}],
@@ -63,6 +66,8 @@ class FakeModel:
         answer = self.answers.get((nregistro, ingredient), "not_found")
         if isinstance(answer, Exception):
             raise answer
+        if isinstance(answer, dict):
+            return answer
         if answer == "found":
             return _found(nregistro)
         if answer in ("rejected", "error"):
@@ -74,7 +79,7 @@ class FakeModel:
 # ---------------------------------------------------------------- medicine list
 
 def _all_patient_medicines():
-    paths = sorted(PATIENTS_DIR.glob("*.json")) + [PROJECT_ROOT / "data" / "demo" / "pacientes_demo.json"]
+    paths = sorted(path for path in PATIENTS_DIR.glob("*.json") if path.name != "patient_scenarios.json") + [PROJECT_ROOT / "data" / "demo" / "pacientes_demo.json"]
     for path in paths:
         data = json.loads(path.read_text(encoding="utf-8"))
         for patient in data if isinstance(data, list) else [data]:
@@ -123,6 +128,62 @@ def test_both_directions_are_asked_and_found_becomes_a_finding():
     assert result.could_not_check == []
 
 
+def test_documented_absence_is_information_not_an_interaction_alert():
+    patient = _patient([("63064", "Doctor")])
+    answer = _found("88372")
+    answer["response"]["interaction_detected"] = False
+    answer["response"]["description"] = "La fuente no describe interacci?n en las condiciones indicadas."
+    model = FakeModel({("88372", "warfarina"): answer})
+    result = check_new_medicine(patient, _proposed("88372"), CATALOGUE, review=model)
+    [finding] = result.findings
+    assert finding.tipo == "informacion"
+    assert finding.all_citations
+    report = generate_report(patient, result.findings)
+    assert report.counts["interaccion"] == 0
+    assert "Documented information (not interaction alerts)" in report.markdown
+    assert answer["response"]["citations"][0]["literal_quote"] in report.markdown
+
+
+def test_found_without_interaction_classification_is_not_an_alert():
+    patient = _patient([("63064", "Doctor")])
+    answer = _found("88372")
+    del answer["response"]["interaction_detected"]
+    result = check_new_medicine(
+        patient, _proposed("88372"), CATALOGUE,
+        review=FakeModel({("88372", "warfarina"): answer}),
+    )
+    assert result.findings == []
+    assert any("expected format" in item for item in result.could_not_check)
+
+
+def test_all_rag_citations_reach_the_report():
+    patient = _patient([("63064", "Doctor")])
+    answer = _found("88372")
+    answer["response"]["citations"].append({
+        "nregistro": "88372", "seccion": "4.5.1",
+        "literal_quote": "Segunda cita que conserva las condiciones descritas en la fuente",
+    })
+    result = check_new_medicine(
+        patient, _proposed("88372"), CATALOGUE,
+        review=FakeModel({("88372", "warfarina"): answer}),
+    )
+    [finding] = result.findings
+    assert len(finding.all_citations) == 2
+    report = generate_report(patient, result.findings, proposed=_proposed("88372"))
+    assert [block.text for block in report.blocks if block.kind == "quote"] == [
+        citation["literal_quote"] for citation in answer["response"]["citations"]
+    ]
+
+
+def test_default_review_delegates_to_shared_rag(monkeypatch):
+    from src.Rag import rag
+    patient = _patient([("63064", "Doctor")])
+    model = FakeModel()
+    monkeypatch.setattr(rag, "review_interaction", model)
+    check_new_medicine(patient, _proposed("88372"), CATALOGUE)
+    assert model.calls == [("88372", "warfarina"), ("63064", "ibuprofeno")]
+
+
 def test_combination_medicine_is_searched_for_each_ingredient():
     patient = _patient([("65222", "Dr. Ibáñez (Urgencias)")])  # amoxicillin + clavulanic acid
     model = FakeModel()
@@ -132,18 +193,38 @@ def test_combination_medicine_is_searched_for_each_ingredient():
     assert ("65222", "warfarina") in model.calls
 
 
-def test_current_medicine_without_sheet_is_searched_in_one_direction():
-    patient = _patient([("07383002", "Dra. Medina (Atención Primaria)")])  # Januvia, no sheet
+def test_shared_ingredient_does_not_hide_other_combination_ingredients():
+    catalogue = {**CATALOGUE, "combo": main.CatalogueEntry(
+        nregistro="combo", nombre="Synthetic combination",
+        principios_activos=["paracetamol", "ibuprofeno"], ficha=True,
+    )}
+    patient = _patient([("68339", "Doctor")])
+    proposed = Medication(nregistro="combo", nombre="Synthetic combination",
+                          dosis="Not specified", prescriptor="Doctor")
     model = FakeModel()
-    result = check_new_medicine(patient, _proposed("55211"), CATALOGUE, review=model)
+    result = check_new_medicine(patient, proposed, catalogue, review=model)
+    assert model.calls == [
+        ("combo", "paracetamol"), ("68339", "paracetamol"), ("68339", "ibuprofeno"),
+    ]
+    assert any(finding.tipo == "duplicado" for finding in result.findings)
+    assert len(result.log) == planned_questions(patient, proposed, catalogue) == 3
+
+
+def test_current_medicine_without_sheet_is_searched_in_one_direction():
+    patient = _patient([("07383002", "Dra. Medina (Atención Primaria)")])
+    # Simulate missing coverage independently of the real shared CIMA file.
+    catalogue = {**CATALOGUE, "07383002": replace(CATALOGUE["07383002"], ficha=False)}
+    model = FakeModel()
+    result = check_new_medicine(patient, _proposed("55211"), catalogue, review=model)
     assert model.calls == [("55211", "sitagliptina")]
     assert any("only the Dianben" in item for item in result.could_not_check)
 
 
 def test_proposed_medicine_without_sheet_is_looked_for_in_the_other_sheets():
     patient = _patient([("63064", "Dr. Gómez (Cardiología)")])
+    catalogue = {**CATALOGUE, "07383002": replace(CATALOGUE["07383002"], ficha=False)}
     model = FakeModel()
-    result = check_new_medicine(patient, _proposed("07383002"), CATALOGUE, review=model)
+    result = check_new_medicine(patient, _proposed("07383002"), catalogue, review=model)
     assert model.calls == [("63064", "sitagliptina")]
     assert any("only the Aldocumar" in item for item in result.could_not_check)
 
@@ -205,9 +286,9 @@ def test_review_asks_about_every_pair():
 
 def _real_rules():
     try:
-        from src import reglas
+        from src.Cascades import reglas
     except SyntaxError as exc:
-        pytest.skip(f"src/reglas.py does not load yet ({exc.msg}); fix it to run these tests")
+        pytest.skip(f"src/Cascades/reglas.py does not load yet ({exc.msg}); fix it to run these tests")
     return reglas
 
 
@@ -236,6 +317,21 @@ def test_review_with_rules_finds_the_duplicate(rule_data):
     result = review_patient(patient, CATALOGUE, rule_data=rule_data)
     assert [f.tipo for f in result.findings] == ["duplicado"]
     assert result.unchecked == {"interaccion"}
+
+
+def test_rules_use_shared_builder_and_cascade_detector(monkeypatch, rule_data):
+    from unittest.mock import Mock
+    from src.Cascades import reglas
+    build = Mock(wraps=reglas.build_medications)
+    cascades = Mock(wraps=reglas.find_cascades)
+    monkeypatch.setattr(reglas, "build_medications", build)
+    monkeypatch.setattr(reglas, "find_cascades", cascades)
+    patient = _patient([("65461", "Doctor")])
+    result = check_new_medicine(patient, _proposed("64140"), CATALOGUE,
+                                rule_data=rule_data, use_model=False)
+    build.assert_called_once()
+    cascades.assert_called_once()
+    assert [finding.tipo for finding in result.findings] == ["cascada"]
 
 
 def test_new_medicine_can_complete_a_cascade(rule_data):
@@ -303,51 +399,109 @@ def test_check_report_lists_the_proposed_medicine_and_unfinished_checks():
 # ---------------------------------------------------------------- status checks
 
 def test_model_status_without_libraries(monkeypatch):
-    def missing():
-        raise ModuleNotFoundError("No module named 'groq'", name="groq")
-    monkeypatch.setattr(revision, "_import_rag", missing)
+    original_import = builtins.__import__
+    def missing(name, *args, **kwargs):
+        if name == "src.Rag":
+            raise ModuleNotFoundError("No module named 'groq'", name="groq")
+        return original_import(name, *args, **kwargs)
+    monkeypatch.setattr(builtins, "__import__", missing)
     ready, message = model_status()
     assert not ready and "groq" in message
 
 
 def test_model_status_without_index(monkeypatch, tmp_path):
-    monkeypatch.setattr(revision, "_import_rag", lambda: None)
     ready, message = model_status(tmp_path / "missing")
     assert not ready and "index" in message
 
 
 def test_model_status_without_key(monkeypatch, tmp_path):
-    monkeypatch.setattr(revision, "_import_rag", lambda: None)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     ready, message = model_status(tmp_path)
     assert not ready and "GROQ_API_KEY" in message
 
 
 def test_model_status_ready(monkeypatch, tmp_path):
-    monkeypatch.setattr(revision, "_import_rag", lambda: None)
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
     assert model_status(tmp_path) == (True, "connected")
 
 
 def test_rules_status_when_the_rules_file_is_broken(monkeypatch):
-    def broken():
-        raise SyntaxError("from __future__ imports must occur at the beginning of the file")
-    monkeypatch.setattr(revision, "_import_rules", broken)
+    original_import = builtins.__import__
+    def broken(name, *args, **kwargs):
+        if name == "src.Cascades":
+            raise SyntaxError("from __future__ imports must occur at the beginning of the file")
+        return original_import(name, *args, **kwargs)
+    monkeypatch.setattr(builtins, "__import__", broken)
     ready, message = rules_status()
     assert not ready and "could not be loaded" in message
 
 
-def test_rules_status_without_nomenclator_file_uses_the_medicine_list(monkeypatch, tmp_path):
-    monkeypatch.setattr(revision, "_import_rules", lambda: None)
+def test_rules_status_without_nomenclator_file(monkeypatch, tmp_path):
     ready, message = rules_status(tmp_path / "prescriptions.json")
     assert ready and "medicine list" in message
 
 
-def test_rules_status_with_nomenclator_file(monkeypatch, tmp_path):
-    monkeypatch.setattr(revision, "_import_rules", lambda: None)
+def test_rules_status_ready(monkeypatch, tmp_path):
     path = tmp_path / "prescriptions.json"
     path.write_text("{}", encoding="utf-8")
     assert rules_status(path) == (True, "connected, using the nomenclator codes")
+
+def test_duplicate_ingredient_does_not_trigger_self_interactions():
+    patient = _patient([
+        ("68339", "Doctor A"),
+        ("85780", "Doctor B"),
+    ])
+
+    model = FakeModel({
+        ("68339", "paracetamol"): "found",
+        ("85780", "paracetamol"): "found",
+    })
+
+    result = review_patient(
+        patient,
+        CATALOGUE,
+        use_model=True,
+        review=model,
+    )
+
+    assert model.calls == []
+    assert planned_questions(patient, None, CATALOGUE) == 0
+    assert any(f.tipo == "duplicado" for f in result.findings)
+    assert not any(f.tipo == "interaccion" for f in result.findings)
+
+
+
+def test_repeated_search_reuses_result_within_review():
+    patient = _patient([
+        ("68339", "Doctor A"),
+        ("85780", "Doctor B"),
+    ])
+
+    model = FakeModel()
+
+    result = check_new_medicine(
+        patient,
+        _proposed("88372"),
+        CATALOGUE,
+        review=model,
+    )
+
+    assert model.calls.count(
+        ("88372", "paracetamol")
+    ) == 1
+
+    assert len(model.calls) == 3
+    assert len(result.log) == 4
+
+    # A separate review must not reuse the previous cache.
+    check_new_medicine(
+        patient,
+        _proposed("88372"),
+        CATALOGUE,
+        review=model,
+    )
+
+    assert len(model.calls) == 6
 
 
 # ---------------------------------------------------------------- stored model answers
@@ -392,3 +546,34 @@ def test_storing_script_stops_without_the_model(monkeypatch, capsys):
     monkeypatch.setattr(guardar_interacciones, "model_status", lambda: (False, "no key"))
     assert guardar_interacciones.main([]) == 1
     assert "no key" in capsys.readouterr().out
+
+
+def test_proposed_furosemide_can_complete_cascade(rule_data):
+    patient = _patient([("65461", "Doctor")])
+    result = check_new_medicine(
+        patient, _proposed("64140"), CATALOGUE,
+        rule_data=rule_data, use_model=False,
+    )
+    [cascade] = [f for f in result.findings if f.tipo == "cascada"]
+    assert cascade.descripcion.startswith("C01:")
+
+
+def test_legacy_stored_answer_is_not_treated_as_classified(tmp_path):
+    path = tmp_path / "legacy.json"
+    response = _found("88372")["response"]
+    response.pop("interaction_detected")
+
+    path.write_text(json.dumps({
+        "generated_at": "2026-11-23",
+        "answers": [{
+            "sheet": "88372",
+            "ingredient": "warfarina",
+            "status": "found",
+            "response": response,
+        }],
+    }), encoding="utf-8")
+
+    stored = load_stored_answers(path)
+    answer = stored_review(stored)("88372", "warfarina")
+    assert answer["status"] == "error"
+    assert answer["reason"] == "legacy_unclassified"

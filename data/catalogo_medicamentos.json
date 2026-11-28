@@ -1,6 +1,17 @@
 {
-  "_nota": "Medicines the screen can use (Person 5). 'principios_activos' are the active-ingredient names, in Spanish, that the interaction search looks for in the other medicine's technical sheet (case and accents are ignored). 'ficha' is true when the shared CIMA file (fragmentos_cima_2026-11-10_v3.json) has this medicine's technical sheet, so the model can search it. Only medicines with 'ficha' true can be chosen as a new medicine. Ingredient names were written from the medicine names; check them against the nomenclator. Registration 87970 is in the CIMA file but not in any patient file yet, so it still needs to be added. 'atc' holds each medicine's WHO ATC code. When data/processed/prescriptions.json is missing (for example on the shared link), Person 2's rules use these ATC codes and the ingredient names instead of the nomenclator codes.",
+  "_nota": "Combined medicine catalogue. Active ingredients support interaction searches. ATC codes support offline rules. Technical-sheet availability must be verified against the installed CIMA snapshot.",
   "medicamentos": [
+    {
+      "nregistro": "07383002",
+      "nombre": "Januvia 25 mg comprimidos",
+      "principios_activos": [
+        "sitagliptina"
+      ],
+      "ficha": true,
+      "atc": [
+        "A10BH01"
+      ]
+    },
     {
       "nregistro": "55211",
       "nombre": "Dianben 850 mg comprimidos",
@@ -91,6 +102,17 @@
       ]
     },
     {
+      "nregistro": "66327",
+      "nombre": "Geloprofen 400 mg comprimidos recubiertos con película",
+      "principios_activos": [
+        "ibuprofeno"
+      ],
+      "ficha": true,
+      "atc": [
+        "M01AE01"
+      ]
+    },
+    {
       "nregistro": "66602",
       "nombre": "Omeprazol Vir 40 mg c?psulas duras gastrorresistentes",
       "principios_activos": [
@@ -135,6 +157,29 @@
       ]
     },
     {
+      "nregistro": "71622",
+      "nombre": "Clopidogrel Cinfamed 75 mg comprimidos",
+      "principios_activos": [
+        "clopidogrel"
+      ],
+      "ficha": true,
+      "atc": [
+        "B01AC04"
+      ]
+    },
+    {
+      "nregistro": "73561",
+      "nombre": "Combiprasal 0,5/2,5 mg solución para nebulizador",
+      "principios_activos": [
+        "ipratropio",
+        "salbutamol"
+      ],
+      "ficha": true,
+      "atc": [
+        "R03AL02"
+      ]
+    },
+    {
       "nregistro": "74483",
       "nombre": "Normogastrol 20 mg comprimidos gastrorresistentes",
       "principios_activos": [
@@ -168,6 +213,17 @@
       ]
     },
     {
+      "nregistro": "80733",
+      "nombre": "Atorvastatina Stada 80 mg comprimidos",
+      "principios_activos": [
+        "atorvastatina"
+      ],
+      "ficha": true,
+      "atc": [
+        "C10AA05"
+      ]
+    },
+    {
       "nregistro": "85780",
       "nombre": "Antidol 1 g comprimidos",
       "principios_activos": [
@@ -179,6 +235,17 @@
       ]
     },
     {
+      "nregistro": "87970",
+      "nombre": "LOPERAMIDA AUROVITAS 2 MG CAPSULAS DURAS",
+      "principios_activos": [
+        "loperamida"
+      ],
+      "ficha": true,
+      "atc": [
+        "A07DA03"
+      ]
+    },
+    {
       "nregistro": "88372",
       "nombre": "Ibudol 400 mg cápsulas blandas",
       "principios_activos": [
@@ -187,62 +254,6 @@
       "ficha": true,
       "atc": [
         "M01AE01"
-      ]
-    },
-    {
-      "nregistro": "07383002",
-      "nombre": "Januvia 25 mg comprimidos",
-      "principios_activos": [
-        "sitagliptina"
-      ],
-      "ficha": true,
-      "atc": [
-        "A10BH01"
-      ]
-    },
-    {
-      "nregistro": "66327",
-      "nombre": "Geloprofen 400 mg comprimidos recubiertos con película",
-      "principios_activos": [
-        "ibuprofeno"
-      ],
-      "ficha": true,
-      "atc": [
-        "M01AE01"
-      ]
-    },
-    {
-      "nregistro": "71622",
-      "nombre": "Clopidogrel Cinfamed 75 mg comprimidos",
-      "principios_activos": [
-        "clopidogrel"
-      ],
-      "ficha": true,
-      "atc": [
-        "B01AC04"
-      ]
-    },
-    {
-      "nregistro": "73561",
-      "nombre": "Combiprasal 0,5/2,5 mg solución para nebulizador",
-      "principios_activos": [
-        "ipratropio",
-        "salbutamol"
-      ],
-      "ficha": true,
-      "atc": [
-        "R03AL02"
-      ]
-    },
-    {
-      "nregistro": "80733",
-      "nombre": "Atorvastatina Stada 80 mg comprimidos",
-      "principios_activos": [
-        "atorvastatina"
-      ],
-      "ficha": true,
-      "atc": [
-        "C10AA05"
       ]
     }
   ]

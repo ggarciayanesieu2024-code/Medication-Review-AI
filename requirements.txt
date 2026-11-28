@@ -1,11 +1,15 @@
-# Direct project dependencies. The app has not been implemented yet.
+# Full project environment for local use and website deployment.
 streamlit
+pydantic
+python-dotenv
+reportlab
 requests
 beautifulsoup4
 sentence-transformers
 chromadb
 openai
-pydantic
-python-dotenv
 pytest
 groq
+jupyterlab
+ipykernel
+ipywidgets

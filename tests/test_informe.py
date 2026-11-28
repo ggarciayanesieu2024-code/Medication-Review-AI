@@ -1,4 +1,4 @@
-"""Tests for the report (src/informe.py) and its download formats (src/exportar.py).
+"""Tests for the report (src/Reports/informe.py) and its download formats (src/Reports/exportar.py).
 
 The full set of unsafe and safe example sentences (tests/fixtures/safety_cases.json)
 is Person 5's next deliverable; these tests cover the footer, the report structure,
@@ -10,9 +10,9 @@ from pathlib import Path
 import pytest
 
 from src.config import PATIENTS_DIR, PROJECT_ROOT
-from src.exportar import render_html, render_pdf
-from src.informe import FOOTER, find_forbidden_phrases, generate_report, save_report
-from src.modelos import Finding, Patient
+from src.Reports.exportar import render_html, render_pdf
+from src.Reports.informe import FOOTER, find_forbidden_phrases, generate_report, save_report
+from src.Reports.informe import Finding, Patient
 
 DEMO_DIR = PROJECT_ROOT / "data" / "demo"
 SAMPLE = json.loads((DEMO_DIR / "hallazgos_ejemplo.json").read_text(encoding="utf-8"))
@@ -25,7 +25,7 @@ def _load(path: Path) -> list[Patient]:
 
 DEV_PATIENTS = [
     p
-    for path in sorted(PATIENTS_DIR.glob("*.json")) + [DEMO_DIR / "pacientes_demo.json"]
+    for path in sorted(path for path in PATIENTS_DIR.glob("*.json") if path.name != "patient_scenarios.json") + [DEMO_DIR / "pacientes_demo.json"]
     for p in _load(path)
     if p.grupo == "desarrollo"
 ]
@@ -68,7 +68,7 @@ def test_sample_citations_point_to_a_medicine_of_that_patient():
 
 EVAL_RAW = [
     item
-    for path in sorted(PATIENTS_DIR.glob("*.json"))
+    for path in sorted(path for path in PATIENTS_DIR.glob("*.json") if path.name != "patient_scenarios.json")
     for item in (lambda d: d if isinstance(d, list) else [d])(json.loads(path.read_text(encoding="utf-8")))
     if item.get("grupo") == "evaluacion"
 ]
@@ -139,7 +139,7 @@ def test_interaction_shows_medicine_name_and_section():
 
 def test_pairs_without_information_are_not_called_safe():
     md = _report(BY_ID["C"]).markdown
-    assert "Pairs checked with no information found" in md
+    assert "Directional evidence checks with no information found" in md
     assert "does not mean the combination is safe" in md
 
 
@@ -218,7 +218,7 @@ def test_save_report_writes_pdf_and_html(tmp_path):
 # the shared FORBIDDEN_PHRASES yet: they run as strict expected failures (XFAIL),
 # so a fix shows up as XPASS and the fixture must then be updated.
 
-from src.informe import _md  # noqa: E402  (Markdown escaping used by the report)
+from src.Reports.informe import _md  # noqa: E402  (Markdown escaping used by the report)
 
 SAFETY = json.loads((PROJECT_ROOT / "tests" / "fixtures" / "safety_cases.json").read_text(encoding="utf-8"))
 
@@ -271,8 +271,8 @@ def test_safe_generated_text_is_shown(text):
 
 def test_report_check_matches_the_rag_pipeline():
     """The report and src/rag.py must normalise text the same way."""
-    rag = pytest.importorskip("src.rag", reason="model libraries not installed")
-    from src.informe import normalise_text
+    rag = pytest.importorskip("src.Rag.rag", reason="model libraries not installed")
+    from src.Reports.informe import normalise_text
 
     for case in SAFETY["unsafe"] + SAFETY["safe"]:
         assert normalise_text(case["text"]) == rag.normalise_text(case["text"])

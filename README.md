@@ -1,88 +1,97 @@
 # Medication Review AI
 
-Group project for IE University's AI and Machine Learning Foundations course. The planned product is a **prototype for healthcare professionals** to review a synthetic patient's medication list, highlight possible duplicate ingredients, retrieve relevant information from official CIMA drug documents, and show the source of each finding.
+IE University AI and Machine Learning Foundations group project: a **prototype for healthcare professionals** to review synthetic medication lists using deterministic rules and official AEMPS/CIMA technical sheets.
 
-**Current status: repository setup only.** The app, data pipeline, rules, evaluation, and example patients have not been implemented. The commands below prepare the Python environment; they do not launch a working demo yet.
+The system flags shared active ingredients, medicines in the same ATC family, possible prescribing cascades, and evidence-supported interactions. It can review a patient's medicines, answer a question using the patient sheet, or check a proposed medicine. Findings include sources and coverage limitations. The clinician decides; the system does not diagnose or prescribe treatment changes.
+
+The Streamlit interface uses the production modules in `src/`. `MAIN.ipynb` runs those same functions locally, with separate stages for inspecting inputs, retrieval, prompts, answers and evaluation. Standalone questions without a patient are available through the notebook/RAG API; the website currently requires a patient.
 
 ## 1. Set up Python
 
-Install Python 3.11 or newer and [uv](https://docs.astral.sh/uv/getting-started/installation/). Open a terminal in this repository, then run:
+Use Python 3.11 or newer and [uv](https://docs.astral.sh/uv/getting-started/installation/). From the repository root:
 
 ```powershell
 uv venv .venv
 uv pip install -r requirements.txt
 ```
 
-This creates a local Python virtual environment named `.venv` and installs the project's planned libraries. Each teammate runs these two commands on their own computer. The `.venv` folder is intentionally excluded from Git.
+Alternatively, create the environment with `py -m venv .venv`, then install with `.venv\Scripts\python -m pip install -r requirements.txt`. The root `requirements.txt` is shared by local use and deployment.
 
-If you do not use uv, the equivalent commands are:
-
-```powershell
-py -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
-```
-
-### Activate it when you return to the project
-
-Run the appropriate command **from the repository folder** in each new terminal session:
+To activate the environment:
 
 | Terminal | Command |
 | --- | --- |
 | Windows PowerShell | `.venv\Scripts\Activate.ps1` |
 | Windows Command Prompt | `.venv\Scripts\activate.bat` |
-| macOS or Linux | `source .venv/bin/activate` |
+| macOS / Linux | `source .venv/bin/activate` |
 
-The terminal should show `(.venv)`. Run `python --version` to check that Python works. Run `deactivate` when finished. If PowerShell blocks the activation script, you can still use `.venv\Scripts\python` directly; activation is optional for `uv pip install -r requirements.txt` because uv finds `.venv` automatically.
+You can also call `.venv\Scripts\python` directly on Windows without activation. The commands below assume the repository root as the working directory.
 
 ## 2. Prepare the API key
 
-When the LLM part is implemented, copy `.env.example` to `.env` and put your own Groq API key in `.env`. On PowerShell:
+Copy `.env.example` to `.env` and set `GROQ_API_KEY` for model calls:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Never commit `.env` or paste an API key into GitHub. No key is needed to create the environment. The model and free-tier limits should be checked against Groq's current documentation before coding that part.
+Keep `.env` private. Paths and default model/retrieval settings are in `src/config.py`; `GROQ_MODEL` can override the default model. Rules-only checks need no API key. Retrieval needs the CIMA index and E5 embedding model, which may download on first use.
 
-## 3. Planned repository layout
+## 3. Repository layout
 
-| Path | Intended use |
+| Path | Use |
 | --- | --- |
-| `data/raw/` | Downloaded CIMA responses for a repeatable demo |
-| `data/fichas/` | Cleaned drug-information sections |
-| `data/pacientes/` | Invented patient examples only |
-| `data/cascadas.json` | Curated, sourced prescribing-cascade hypotheses |
-| `src/ingesta.py` | CIMA download and cleaning |
-| `src/indice.py` | Section indexing and embeddings |
-| `src/rag.py` | Retrieval and LLM call |
-| `src/reglas.py` | Deterministic checks |
-| `src/verificacion.py` | Citation verification |
-| `src/modelos.py` | Pydantic data models |
-| `app.py` | Streamlit interface |
-| `evaluacion/` | Labelled questions and evaluation script |
-| `tests/` | Tests for the rules |
-| `docs/` | Technical, end-to-end, and ethics documentation |
+| `MAIN.ipynb` | Interactive local runner for the production pipeline and evaluation |
+| `app.py` / `app_deploy/streamlit_app.py` | Local Streamlit interface / hosted entry point for the same app |
+| `src/main.py` | Coordinates patient reviews, patient questions and proposed-medicine checks |
+| `src/config.py` / `src/llm.py` | Shared paths/settings and Groq calls with Pydantic response validation |
+| `src/Data/` | Downloading, parsing and conditional preparation of local resources |
+| `src/Rag/` | Indexing, filtered retrieval, prompts, answers and citation verification |
+| `src/Cascades/` | Ingredient duplicates, ATC-family warnings and prescribing-cascade hypotheses |
+| `src/Reports/` | Patient/finding models, report composition and HTML/PDF export |
+| `src/Evaluation/` | Batch RAG evaluator, labelled questions and source manifest |
+| `data/raw/` / `data/processed/` | Downloaded responses / parsed nomenclator and CIMA sections |
+| `data/embeddings/` | Local Chroma index and cached E5 model |
+| `data/pacientes/` / `data/catalogo_medicamentos.json` | Synthetic patients and review scenarios / medicine selection catalogue |
+| `data/cascadas.json` | Curated cascade patterns and bibliography |
+| `tests/` / `docs/` | Automated regression tests / component and project documentation |
 
-The files and folders above are placeholders for the group to fill in. `data/cascadas.json` and `evaluacion/preguntas.json` currently contain empty lists, not evaluated data. The planned Python files contain no implementation.
+Launch the website with the environment active:
+
+```powershell
+streamlit run app.py
+```
+
+Choose a patient or upload a patient JSON file. Leave the question blank for a standard review, enter a patient question, or use the proposed-medicine tab. See `docs/person5.md` for patient format and interface details; `docs/person3.md` explains the integrated RAG and notebook workflow.
+
+## Manual checks and RAG evaluation
+
+Open `MAIN.ipynb` with the project's `.venv` kernel, or launch it with:
+
+```powershell
+.venv\Scripts\python -m jupyterlab MAIN.ipynb
+```
+
+Run imports, choose a prepared scenario or custom patient/question in section 1A, then select controls in 1B. Set `k`, optional `generation_options` and the relevant run switches before continuing; the current switches enable model calls and batch evaluation. Sections 3 and 6 inspect rules and the complete patient workflow; sections 4-5 inspect a separate standalone RAG request. Rerun dependent cells after input changes and restart the kernel after editing imported code.
+
+Section 2 reuses valid local data, downloads missing medicine sections and rebuilds the index when its stored contents differ. Optional update checks report changes without refreshing existing sections. This preparation can change source coverage. For manual data preparation, the existing modules can also be run from the root: `python -m src.Data.download_nomenclator`, `python -m src.Data.parse_nomenclator`, `python -m src.Data.parse_cima --help`, and `python -m src.Rag.indice`.
+
+Section 7 calls `src/Evaluation/evaluar.py` with `evaluation_questions.json`: 15 development and 5 reserved RAG cases. It scores expected source sections and optional answer-status/interaction labels; answer correctness and citation relevance still require inspection. `data/pacientes/patient_scenarios.json` supplies 12 scenarios across 9 patients for manual workflow checks, including cascades and duplicates. `benchmark_manifest.json` records the source snapshot; the notebook does not automatically verify its hashes. Labels are source-checked drafts, and the reserved cases have already been inspected rather than kept completely blind.
+
+Run regression tests with `.venv\Scripts\python -m pytest -q`. Passing tests checks exercised behavior; it does not establish live retrieval quality or clinical correctness. Clear notebook outputs before sharing synthetic patient experiments.
 
 ## Libraries
 
-`requirements.txt` contains only the direct libraries suggested by the project outline: Streamlit for the interface; requests and Beautiful Soup for CIMA retrieval and HTML cleaning; sentence-transformers and ChromaDB for local retrieval; OpenAI's compatible client for the proposed Groq API; Pydantic for validation; python-dotenv for local configuration; and pytest for future tests. Installing sentence-transformers also installs PyTorch, so the first installation may take a while.
+The shared requirements include Streamlit, Pydantic, Groq/OpenAI clients, requests/Beautiful Soup, sentence-transformers, ChromaDB, ReportLab, pytest and Jupyter tooling. Installing sentence-transformers also installs PyTorch, so the first installation may take time.
 
 ## Scope and safeguards
 
-The course brief requires source code, clear run instructions, technical and end-to-end documentation, a presentation, and a live demo. This repository currently provides the starting structure for that work.
-
-Use **synthetic patient data only**. The eventual tool should support professional review and cite the exact source section for a finding. It must not diagnose or recommend stopping or changing treatment. Proposed clinical rules, including duplicate detection from ATC codes and prescribing-cascade examples, need source review and testing before implementation; the outline is a plan, not validated clinical logic.
+Use synthetic patients only. Keep absent evidence, failed checks and documented negative findings distinct: `not_found` never establishes safety. Cascade matches are hypotheses based on co-occurrence; the rules do not establish prescribing sequence, causality or dose-dependent risk. Automatic citation checks verify quotation presence and identifiers, not whether a quotation supports the answer. The prototype still needs manual review, live evaluation and tuning.
 
 ## Known limitations of CIMA data
 
-- Some mathematical symbols (≥, ≤) appear as `?` in certain fragments of `fragmentos_cima.json`. This comes from the leaflet published on CIMA, not from the parser: the same leaflet shows `?` on some lines and `≥` on others.
-- The affected fragments are in sections 4.2, 4.4 and 4.8 (Aldocumar, Ibudol and Januvia leaflets). None belongs to section 4.5, which the system uses to detect interactions.
-- Sentence-by-sentence verification against the official leaflet has been done for three section 4.5 fragments: 64014 (PPI), 59718 (warfarin) and 74483. The remaining fragments have not been compared.
+Some mathematical symbols appear as `?` in the supplied CIMA sections. Long sections can exceed E5's input limit: the index keeps the complete source text, but its embedding represents only the supported input length. The interaction mention filter can miss class names and synonyms. Selected benchmark passages have been checked against official sheets; the entire local corpus has not been verified sentence by sentence.
 
 ## Shared data
 
-Large generated files are not in Git. They are shared through the team Drive folder, with a `.txt` containing the SHA256 hash. Check the hash before use (`Get-FileHash <file> -Algorithm SHA256`).
-
-Current CIMA file: `fragmentos_cima_2026-11-10_v3.json` (18 registration numbers, 99 fragments). Earlier versions are obsolete.
+Large raw/generated data and local indexes are not in Git. The team's shared CIMA snapshot is `fragmentos_cima_2026-11-10_v3.json` (18 registrations, 99 sections). Place it at `data/processed/fragmentos_cima.json` before preparation. Obtain the parsed nomenclator through the shared data or the preparation scripts. Check supplied SHA256 values with `Get-FileHash <file> -Algorithm SHA256`. If notebook preparation updates the sources, recheck affected benchmark labels and snapshot hashes.

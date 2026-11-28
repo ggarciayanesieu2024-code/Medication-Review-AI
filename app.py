@@ -1,4 +1,4 @@
-"""Streamlit interface for the medication review (Person 5).
+"""Streamlit interface for patient reviews and evidence-grounded questions.
 
 Run from the project root:
 
@@ -6,20 +6,17 @@ Run from the project root:
 
 Two tabs:
 
-* Review current medicines - checks every medicine the patient already takes.
+* Review current medicines - accepts a patient JSON sheet and optional question.
+  Without a question, checks every medicine the patient already takes.
 * Check a new medicine - checks a medicine the prescriber is considering,
   against the patient's current medicines, before it is prescribed.
 
-Both use the real system when it is available (see src/revision.py):
-
-* Rules (Person 2): nomenclator codes from data/processed/prescriptions.json,
-  or the ATC codes in data/catalogo_medicamentos.json when that file is missing.
-* Interactions (Person 3's model): asked live when the model is set up (full
-  requirements, search index, GROQ_API_KEY); otherwise read from
-  data/interacciones_guardadas.json, made once by `python -m src.guardar_interacciones`.
-
-The report always says which checks did not run. When neither part is
-available, the review tab shows SAMPLE findings under a "Sample data" banner.
+Both use the real system when it is available (see src/main.py):
+The rules need data/processed/prescriptions.json; the model needs
+the full requirements, the search index and GROQ_API_KEY. The report always
+says which checks did not run. When neither part is available, the review tab
+shows SAMPLE findings (data/demo/hallazgos_ejemplo.json) under a "Sample data"
+banner, so the screen can still be shown.
 """
 from __future__ import annotations
 
@@ -29,16 +26,17 @@ import streamlit as st
 from pydantic import ValidationError
 
 from src.config import PATIENTS_DIR, PROJECT_ROOT
-from src.informe import generate_report, save_report
-from src.modelos import Medication, Patient
-from src.revision import (
+from src.Reports.informe import generate_report, save_report
+from src.Reports.informe import Medication, Patient
+from src.Reports.informe import cima_source_url
+from src.main import (
     check_new_medicine,
     load_catalogue,
     load_rule_data,
     load_stored_answers,
     model_status,
     planned_questions,
-    review_patient,
+    review_request,
     rules_status,
     stored_review,
 )
@@ -57,7 +55,7 @@ TYPE_LABELS = {
 
 def load_patients() -> tuple[list[tuple[Patient, str]], list[str]]:
     """Read Lucía's patient files and the demo patients, validated with Patient."""
-    files = [(path, "patients") for path in sorted(PATIENTS_DIR.glob("*.json"))]
+    files = [(path, "patients") for path in sorted(path for path in PATIENTS_DIR.glob("*.json") if path.name != "patient_scenarios.json")]
     if DEMO_PATIENTS_FILE.exists():
         files.append((DEMO_PATIENTS_FILE, "demo"))
 
@@ -141,11 +139,324 @@ def progress_bar():
 
 st.set_page_config(page_title="Medication review", page_icon="💊", layout="wide")
 
-st.title("Medication review")
-st.caption(
-    "One view of every medicine a polymedicated patient takes, with each finding traced "
-    "to its official source. The system informs; the clinician decides."
+
+
+st.markdown("""
+<style>
+    .block-container {
+        max-width: 1280px;
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+    }
+
+    [data-testid="stAppViewContainer"] {
+        background: #f3f6fa;
+        color: #172f43;
+    }
+
+    [data-testid="stSidebar"] {
+        background: #102b40;
+    }
+
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3 {
+        color: #e2edf5;
+    }
+
+    [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+        color: #a8bfce;
+    }
+
+    [data-testid="stMetric"] {
+        background: white;
+        border: 1px solid #dfe7ef;
+        border-radius: 12px;
+        padding: 18px;
+    }
+
+    [data-testid="stMetricValue"] {
+        font-size: 30px;
+        font-weight: 650;
+        color: #102b40;
+    }
+
+    button[kind="primary"] {
+        background: #0f766e !important;
+        border-color: #0f766e !important;
+        color: white !important;
+        min-height: 44px;
+        border-radius: 8px;
+    }
+
+    button[kind="primary"]:hover {
+        background: #115e59 !important;
+    }
+
+    [data-testid="stExpander"] {
+        background: white;
+        border-radius: 10px;
+    }
+
+    h1, h2, h3 {
+        letter-spacing: -0.025em;
+    }
+
+    .clinical-hero {
+        background: #ffffff;
+        border: 1px solid #dfe7ef;
+        border-radius: 16px;
+        padding: 26px 30px;
+        margin-bottom: 18px;
+    }
+
+    .clinical-eyebrow {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        color: #0f766e;
+    }
+
+    .clinical-title {
+        font-size: 32px;
+        font-weight: 700;
+        color: #102b40;
+        margin: 8px 0;
+    }
+
+    .clinical-subtitle {
+        color: #64748b;
+        font-size: 14px;
+    }
+
+    .sidebar-brand {
+        font-size: 23px;
+        color: #ffffff;
+        font-weight: 700;
+        letter-spacing: -0.7px;
+        padding: 12px 0;
+    }
+
+    .sidebar-subtitle {
+        font-size: 12px;
+        color: #a8bfce;
+        margin-bottom: 24px;
+    }
+
+    /* Final contrast and spacing refinements */
+
+    .block-container {
+        padding-top: 4rem;
+    }
+
+    [data-testid="stSidebar"] [data-testid="stAlert"] p {
+        color: #134e4a !important;
+    }
+
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] p,
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] button p,
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] button span {
+        color: #334155 !important;
+    }
+
+    [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+        color: #b6cad9 !important;
+    }
+
+    [data-baseweb="tab-highlight"] {
+        background-color: #0f766e !important;
+    }
+
+    [data-baseweb="tab"][aria-selected="true"] {
+        color: #0f766e !important;
+    }
+
+    [data-testid="stHeader"] {
+        background: #f3f6fa;
+    }
+
+    [data-testid="stTextArea"] textarea {
+        background: #ffffff;
+    }
+
+    [data-testid="stMetricLabel"] {
+        color: #475569;
+    }
+
+</style>
+""", unsafe_allow_html=True)
+
+
+
+st.sidebar.markdown(
+    '<div class="sidebar-brand">MedReview AI</div>'
+    '<div class="sidebar-subtitle">Clinical evidence workspace</div>',
+    unsafe_allow_html=True,
 )
+
+workflow = st.sidebar.radio(
+    "Workspace",
+    ["Patient review", "Standalone medicine question"],
+    key="workflow_mode",
+)
+
+if workflow == "Patient review":
+    page_title = "Patient medication review"
+    page_subtitle = (
+        "Review medicines, investigate potential interactions "
+        "and assess prescribing cascades."
+    )
+else:
+    page_title = "Medicine evidence search"
+    page_subtitle = (
+        "Ask a focused question using official CIMA technical sheets."
+    )
+
+st.markdown(
+    f'<div class="clinical-hero">'
+    f'<div class="clinical-eyebrow">CLINICAL WORKSPACE</div>'
+    f'<div class="clinical-title">{page_title}</div>'
+    f'<div class="clinical-subtitle">{page_subtitle}</div>'
+    f'</div>',
+    unsafe_allow_html=True,
+)
+
+if workflow == "Standalone medicine question":
+    st.sidebar.caption("Synthetic-patient research prototype")
+
+    st.caption(
+        "Ask a general question using official CIMA technical sheets. "
+        "No patient information is required."
+    )
+
+    catalogue = load_catalogue()
+    model_ready, model_message = model_status()
+
+    if not model_ready:
+        st.warning(f"Model unavailable: {model_message}")
+        st.stop()
+
+    available = sorted(
+        [entry for entry in catalogue.values() if entry.ficha],
+        key=lambda entry: entry.nombre.casefold(),
+    )
+
+    if not available:
+        st.warning("No technical sheets are available.")
+        st.stop()
+
+    registration = st.selectbox(
+        "Medicine",
+        options=[entry.nregistro for entry in available],
+        format_func=lambda n: catalogue[n].nombre,
+        index=None,
+        placeholder="Choose a medicine",
+        key="standalone_medicine",
+    )
+
+    question = st.text_area(
+        "Your question",
+        placeholder="What are the documented interactions or contraindications?",
+        max_chars=4000,
+        key="standalone_question",
+    ).strip()
+
+    request_key = (registration, question)
+
+    if st.button(
+        "Get evidence-based answer",
+        type="primary",
+        disabled=not registration or not question,
+        key="standalone_submit",
+    ):
+        st.session_state.pop("standalone_result", None)
+
+        try:
+            from src.Rag.rag import answer_question
+
+            with st.spinner("Searching and verifying CIMA evidence..."):
+                result = answer_question(
+                    question,
+                    nregistro=registration,
+                )
+
+            st.session_state["standalone_result"] = {
+                "request": request_key,
+                "result": result,
+            }
+
+        except Exception:
+            st.error(
+                "The evidence search could not be completed."
+            )
+
+    if registration:
+        standalone_source_link = cima_source_url(registration)
+        if standalone_source_link:
+            st.markdown(
+                f"[Open official CIMA technical sheet]({standalone_source_link})"
+            )
+
+    saved = st.session_state.get("standalone_result")
+
+    if saved and saved["request"] == request_key:
+        result = saved["result"]
+        response = result.get("response") or {}
+
+        if result.get("context_limited"):
+            st.info(
+                "Selected excerpts from the retrieved technical sheets "
+                "were used to stay within the model's context limit. "
+                "This answer is not an exhaustive review."
+            )
+
+        if result["status"] == "found":
+            st.success("Source quotations verified against CIMA")
+            st.markdown("### Answer")
+            st.write(response.get("description", ""))
+
+            st.markdown("### Supporting evidence")
+
+            for i, citation in enumerate(
+                response.get("citations", []), 1
+            ):
+                with st.expander(
+                    f"Source {i} - CIMA section "
+                    f"{citation['seccion']}",
+                    expanded=True,
+                ):
+                    st.write(citation["literal_quote"])
+                    st.caption(
+                        f"Registration: {citation['nregistro']}"
+                    )
+
+        elif result["status"] == "not_found":
+            st.warning(
+                response.get(
+                    "description",
+                    "No supporting information was found."
+                )
+            )
+            st.caption(
+                "Missing evidence does not establish safety."
+            )
+
+        else:
+            st.error(
+                f"No verified answer was available. "
+                f"Reason: {result.get('reason')}"
+            )
+
+    st.divider()
+    st.caption(
+        "Evidence-based information for professional review. "
+        "This is not a patient-specific assessment or prescribing decision."
+    )
+
+    st.stop()
+
 
 patients, problems = load_patients()
 catalogue = load_catalogue()
@@ -165,48 +476,46 @@ if model_ready:
 elif stored is not None:
     interactions, review_fn = "stored", stored_review(stored)
     interaction_note = (f"These answers were produced by the model on {stored.generated_at} and stored; "
-                        "each quotation was verified against its section when it was produced.")
+                        "these historical answers are not live searches. Legacy answers without interaction classification require another check.")
 else:
     interactions, review_fn, interaction_note = "off", None, None
 use_model = interactions != "off"
 live = rules_ready or use_model
 
 with st.sidebar:
-    st.subheader("How it works")
-    st.markdown(
-        "1. Choose a patient.\n"
-        "2. **Review current medicines**, or **check a new medicine** before prescribing it.\n"
-        "3. Read the report, or download it as a PDF or a web page.\n\n"
-        "Each report is also saved in the `output/` folder."
-    )
+    st.divider()
+    st.caption("Patient settings")
     show_evaluation = st.checkbox(
         "Show evaluation patients",
         value=False,
         help="Evaluation patients are kept aside for the final evaluation. "
         "Build and test with development patients.",
     )
-    st.markdown("**What this version checks**")
-    st.markdown(
-        ("✅" if rules_ready else "⚪") + " Duplicates, drug families and cascades  \n"
-        + {"live": "✅ Interactions (live model)",
-           "stored": f"✅ Interactions (stored answers, {stored.generated_at if stored else ''})",
-           "off": "⚪ Interactions"}[interactions]
-    )
+    st.markdown("**System status**")
+    if rules_ready:
+        st.success("Rules available")
+    else:
+        st.info(f"Rules: not available. Reason: {rules_message}")
+    if model_ready:
+        st.success("AI configured")
+    elif interactions == "stored":
+        st.info("Using historical stored interaction answers")
+    else:
+        st.info(f"Model: not available. Reason: {model_message}")
     if not live:
-        st.caption("**Review current medicines** shows example results for now.")
-    with st.expander("Technical details"):
-        st.caption(f"Rules: {rules_message}." if rules_ready else f"Rules: not available. Reason: {rules_message}")
-        st.caption("Model: connected." if model_ready else f"Model: not available here. Reason: {model_message}")
-        if not model_ready:
-            st.caption("Stored answers: " + (f"from {stored.generated_at}, {len(stored.answers)} searches."
-                                             if stored else "none yet (data/interacciones_guardadas.json)."))
+        st.warning("Example patients use sample findings when the system is unavailable. "
+                   "Uploaded patients use the available ingredient-name checks.")
     st.caption("Synthetic patients only.")
     for problem in problems:
         st.error(problem)
 
 visible = [(p, s) for p, s in patients if show_evaluation or p.grupo != "evaluacion"]
 visible.sort(key=lambda ps: (ps[0].grupo == "evaluacion", ps[1] == "demo", ps[0].id))
-if not visible:
+uploaded_patient = st.sidebar.file_uploader(
+    "Patient sheet (JSON)", type=["json"],
+    help="Upload one patient with id, edad, grupo and medicamentos. Each medicine needs nregistro, nombre, dosis and prescriptor. Optional contexto_clinico adds relevant clinical history.",
+)
+if not visible and uploaded_patient is None:
     st.error("No patient files found in data/pacientes.")
     st.stop()
 
@@ -220,11 +529,25 @@ def patient_label(pid: str) -> str:
     return f"Patient {p.id} · {p.edad} years · {len(p.medicamentos)} medicines{extra}"
 
 
-patient_id = st.selectbox("Patient", list(by_id), format_func=patient_label)
-patient, _ = by_id[patient_id]
+if uploaded_patient is not None:
+    try:
+        patient = Patient.model_validate_json(uploaded_patient.getvalue())
+    except ValidationError as exc:
+        st.error("The uploaded patient JSON does not match the required format.")
+        st.json(exc.errors(include_url=False, include_input=False))
+        st.stop()
+    patient_id = patient.id
+    st.write(f"**Uploaded patient {patient.id} · {patient.edad} years**")
+else:
+    patient_id = st.selectbox("Patient", list(by_id), format_func=patient_label, key="patient_id")
+    patient, _ = by_id[patient_id]
+patient_snapshot = patient.model_dump_json()
 
 prescribers = {m.prescriptor for m in patient.medicamentos}
-st.write(f"**{len(patient.medicamentos)} medicines** from **{len(prescribers)} prescribers**")
+patient_age, medicine_count, prescriber_count = st.columns(3)
+patient_age.metric("Patient age", patient.edad)
+medicine_count.metric("Medicines", len(patient.medicamentos))
+prescriber_count.metric("Prescribers", len(prescribers))
 with st.expander("Medicines on file"):
     st.dataframe(
         [
@@ -240,32 +563,67 @@ tab_review, tab_check = st.tabs(["Review current medicines", "Check a new medici
 # Tab 1: review the current medicines
 # --------------------------------------------------------------------------
 with tab_review:
+    question = st.text_area(
+        "Clinical question (optional)", key="question",
+        placeholder="For example: What should be reviewed if I add Ibudol 400 mg?",
+        help="Leave empty for the standard review. A question uses the patient sheet, medicine rules and CIMA evidence.",
+        max_chars=4000,
+    ).strip()
     if live:
         st.caption(what_runs(rules_ready, interactions))
-        if interactions == "live":
-            n = planned_questions(patient, None, catalogue)
-            st.caption(f"The model will be asked {n} question(s) for this patient, "
-                       "so it can take a minute.")
+        if model_ready:
+            if question:
+                st.caption("The question will be interpreted, checked against the patient sheet, "
+                           "and answered from the available evidence. This can take a minute.")
+            else:
+                n = planned_questions(patient, None, catalogue)
+                if n == 0:
+                    st.caption(
+                        "No drug-pair AI searches are needed for this review."
+                    )
+                else:
+                    st.caption(
+                        f"{n} planned medicine-pair checks. "
+                        "Repeated searches may reuse results."
+                    )
     else:
         note = load_sample_findings().get(patient.id, {}).get("nota")
         if note:
             st.caption(f"Sample: {note}")
 
-    if st.button("Review", type="primary", key="review"):
+    if st.button("Answer clinical question" if question else "Run medication review", type="primary", key="review"):
         bar = None
+        st.session_state.pop("clarification", None)
         try:
-            if live:
+            if live or question or uploaded_patient is not None:
                 bar, update = progress_bar()
-                checked = review_patient(
-                    patient, catalogue, rule_data=rule_data, use_model=use_model,
-                    review=review_fn, progress=update,
+                request = review_request(
+                    patient, catalogue, question, rule_data=rule_data,
+                    use_model=model_ready if question else use_model,
+                    review=None if question else review_fn,
+                    progress=update,
                 )
+                if request.clarification:
+                    st.session_state.pop("result", None)
+                    st.session_state["clarification"] = {
+                        "patient": patient_snapshot, "question": question,
+                        "text": request.clarification,
+                    }
+                    st.warning(request.clarification)
+                    st.stop()
+                st.session_state.pop("clarification", None)
+                checked = request.checks
                 report = generate_report(
                     patient,
                     checked.findings,
                     checked_without_evidence=checked.checked_without_evidence,
                     could_not_check=checked.could_not_check,
                     unchecked_types=checked.unchecked,
+                    proposed=request.proposed,
+                    question=request.question,
+                    answer=request.answer,
+                    answer_citations=request.citations,
+                    supporting_findings=request.supporting_findings,
                     interaction_note=interaction_note,
                 )
             else:
@@ -276,6 +634,7 @@ with tab_review:
                 )
             st.session_state["result"] = {
                 "patient_id": patient.id, "report": report, "files": saved_files(report),
+                "patient": patient_snapshot, "question": question,
             }
         except Exception as exc:  # show the problem on screen, not a stack trace
             st.session_state.pop("result", None)
@@ -284,12 +643,15 @@ with tab_review:
             if bar is not None:
                 bar.empty()
 
+    clarification = st.session_state.get("clarification")
+    if clarification and clarification["patient"] == patient_snapshot and clarification["question"] == question:
+        st.warning(clarification["text"])
     result = st.session_state.get("result")
-    if result and result["patient_id"] == patient.id:
+    if result and result.get("patient") == patient_snapshot and result.get("question") == question:
         show_counts(result["report"], list(TYPE_LABELS.items()))
         show_report(result["report"], result["files"], key="review")
     else:
-        st.info("Click **Review** to see the report for this patient.")
+        st.info("Run a medication review to see the findings.")
 
 # --------------------------------------------------------------------------
 # Tab 2: check a new medicine before prescribing it
@@ -303,6 +665,7 @@ with tab_check:
     choices = sorted(catalogue.values(), key=lambda e: e.nombre.casefold())
     nregistro = st.selectbox(
         "Medicine to prescribe",
+        key="proposed_medicine",
         options=[e.nregistro for e in choices],
         format_func=lambda n: catalogue[n].nombre + ("" if catalogue[n].ficha
                                                      else "  (technical sheet not in the system)"),
@@ -315,6 +678,13 @@ with tab_check:
     dose = c1.text_input("Dose (optional)", placeholder="1 g cada 8 horas")
     prescriber = c2.text_input("Prescriber (optional)", placeholder="Dra. Pérez (Atención Primaria)")
     st.caption(what_runs(rules_ready, interactions))
+
+    check_snapshot = (
+        patient_snapshot,
+        nregistro,
+        dose.strip(),
+        prescriber.strip(),
+    )
 
     if st.button("Check", type="primary", key="check"):
         if nregistro is None:
@@ -343,7 +713,9 @@ with tab_check:
                 )
                 st.session_state["check_result"] = {
                     "patient_id": patient.id, "report": report,
+                    "patient": patient_snapshot,
                     "files": saved_files(report), "log": checked.log,
+                    "check_snapshot": check_snapshot,
                 }
             except Exception as exc:  # show the problem on screen, not a stack trace
                 st.session_state.pop("check_result", None)
@@ -352,11 +724,11 @@ with tab_check:
                 bar.empty()
 
     checked_result = st.session_state.get("check_result")
-    if checked_result and checked_result["patient_id"] == patient.id:
+    if checked_result and checked_result.get("check_snapshot") == check_snapshot:
         show_counts(checked_result["report"], [
             ("duplicado", "Same ingredient"),
             ("interaccion", "Interactions found"),
-            ("checked_without_evidence", "Nothing found"),
+            ("checked_without_evidence", "No evidence found"),
             ("could_not_check", "Could not check"),
         ])
         show_report(checked_result["report"], checked_result["files"], key="check")

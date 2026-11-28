@@ -10,7 +10,8 @@ This document describes the shared configuration, data models, citation verifica
 All implemented Python components now read their shared paths and settings from
 this file. Paths are resolved from the project root, including the existing
 database at `data/embeddings/chroma_db` and model cache at `data/embeddings/E5_model`.
-The data preparation scripts support both direct execution and `python -m src.<name>`.
+Run data preparation scripts from the project root with `python -m src.Data.<name>`
+and rebuild the index with `python -m src.Rag.indice`.
 Their download URLs, timeouts, and other script-specific settings stay in those
 scripts; shared file paths remain in `config.py`.
 Raw nomenclator files are only needed to regenerate the processed catalogue;
@@ -27,13 +28,13 @@ CPU, normalised embeddings, indexing batch size 4, and cosine distance.
 Retrieval defaults to three results. Changing the embedding model or vector
 settings requires rebuilding the index before searching with the new settings.
 
-`src/modelos.py` uses Pydantic to validate patients, medications, CIMA fragments, citations, findings, and prescribing cascades.
+Pydantic models live beside the code that owns them: `Medication`, `Patient` and `Finding` in `src/Reports/informe.py`; `Fragment` and `Citation` in `src/Rag/verificacion.py`; `CascadeCase` and `CascadeTable` in `src/Cascades/reglas.py`; and `StructuredOutputRAG` in `src/llm.py`. Other components import these definitions rather than duplicating them.
 
-The `StructuredOutputRAG` model also validates the AI response structure. Responses marked as `found` must contain citations, while `not_found` responses must have an empty citation list.
+The `StructuredOutputRAG` model also validates the AI response structure. Responses marked as `found` must contain citations, while `not_found` responses must have an empty citation list. Interaction reviews also require an explicit boolean `interaction_detected` for found evidence: `true` describes a potential interaction; `false` records the source's explicit statement of no interaction under its stated conditions. Evidence availability alone does not trigger an alert. This field is optional for general questions and unset when evidence is missing.
 
 ## 2. Citation Verification
 
-`src/verificacion.py` checks whether an AI-generated quotation exists in the referenced CIMA fragment.
+`src/Rag/verificacion.py` checks whether an AI-generated quotation exists in the referenced CIMA fragment.
 
 A citation is accepted only when:
 - The medication registration number matches.

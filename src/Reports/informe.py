@@ -2,7 +2,7 @@
 
 Builds the report for one patient from:
 
-* the patient file (``Patient`` in ``src/modelos.py``, Lucía's format), and
+* the patient file (``Patient`` defined below, Lucía's format), and
 * the findings produced by the rest of the system (``Finding``): duplicates and
   ATC warnings and cascades from the rules (Person 2), interactions from the RAG
   pipeline (Person 3), already checked by the shared citation verifier and
@@ -16,7 +16,7 @@ The report
 4. ALWAYS ends with the mandatory footer.
 
 The report is built once as a list of blocks and then rendered to Markdown (for
-the screen) or, in ``src/exportar.py``, to HTML and PDF. All formats come from
+the screen) or, in ``src/Reports/exportar.py``, to HTML and PDF. All formats come from
 the same blocks, so they always say the same thing.
 
 Defence in depth: generated text (finding descriptions and questions) is checked
@@ -31,10 +31,48 @@ import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Literal
+
+from pydantic import BaseModel, Field
 
 from src.config import FORBIDDEN_PHRASES, PROJECT_ROOT
-from src.modelos import Finding, Medication, Patient
+from src.Rag.verificacion import Citation
+
+
+class Medication(BaseModel):
+    """A medicine in one fictional patient's medication list."""
+
+    nregistro: str = Field(min_length=1)
+    nombre: str = Field(min_length=1)
+    dosis: str = Field(min_length=1)
+    prescriptor: str = Field(min_length=1)
+
+
+class Patient(BaseModel):
+    """A fictional patient used for development or evaluation."""
+
+    id: str = Field(min_length=1)
+    edad: int = Field(ge=0, le=120)
+    grupo: Literal["desarrollo", "evaluacion"]
+    medicamentos: list[Medication] = Field(min_length=1)
+    contexto_clinico: str | None = Field(default=None, min_length=1)
+
+
+class Finding(BaseModel):
+    """A report result, including documented information that is not an alert."""
+
+    tipo: Literal["duplicado", "advertencia_atc", "interaccion", "cascada", "informacion"]
+    descripcion: str = Field(min_length=1)
+    cita: Citation | None = None
+    citations: list[Citation] = Field(default_factory=list)
+    pregunta_medico: str | None = None
+
+    @property
+    def all_citations(self) -> list[Citation]:
+        """Keep legacy single-citation inputs and retain all additional evidence."""
+        citations = [self.cita] if self.cita is not None else []
+        return citations + [citation for citation in self.citations if citation not in citations]
+
 
 FOOTER = (
     "Automatically generated support information. "
@@ -85,7 +123,7 @@ GROUP_LABELS = {"desarrollo": "development patient", "evaluacion": "evaluation p
 
 
 # --------------------------------------------------------------------------
-# Safety check (same normalisation as src/rag.py)
+# Safety check (same normalisation as src/Rag/rag.py)
 # --------------------------------------------------------------------------
 
 def normalise_text(text: str) -> str:
@@ -105,6 +143,15 @@ def find_forbidden_phrases(text: str) -> list[str]:
 # Report structure
 # --------------------------------------------------------------------------
 
+def cima_source_url(nregistro: str) -> str:
+    if not re.fullmatch(r"[0-9]+", str(nregistro)):
+        return ""
+    return (
+        "https://cima.aemps.es/cima/dochtml/ft/"
+        f"{nregistro}/FT_{nregistro}.html"
+    )
+
+
 @dataclass
 class Block:
     """One piece of the report. ``kind`` decides how each renderer draws it.
@@ -119,6 +166,7 @@ class Block:
     header: list[str] = field(default_factory=list)
     rows: list[list[str]] = field(default_factory=list)
     items: list[Any] = field(default_factory=list)
+    url: str = ""
 
 
 @dataclass
@@ -181,6 +229,10 @@ def generate_report(
     interaction_note: str | None = None,
     sample: bool = False,
     generated_at: datetime | None = None,
+    question: str = "",
+    answer: str | None = None,
+    answer_citations: Iterable[Citation] = (),
+    supporting_findings: Iterable[Finding] = (),
 ) -> Report:
     """Build the report for one patient. The footer is always the last block.
 
@@ -229,6 +281,7 @@ def generate_report(
         names[proposed.nregistro] = proposed.nombre
 
     by_type = {tipo: [f for f in findings if f.tipo == tipo] for tipo, _, _ in FINDING_SECTIONS}
+    information = [finding for finding in findings if finding.tipo == "informacion"]
     counts = {
         "medicines": len(patient.medicamentos),
         "prescribers": len(by_prescriber),
@@ -239,6 +292,17 @@ def generate_report(
 
     blocks: list[Block] = []
     add = blocks.append
+
+    def add_finding(finding: Finding) -> None:
+        text = screened(finding.descripcion, f"{finding.tipo} description")
+        add(Block("para", text) if text else Block("note", WITHHELD_TEXT))
+        for citation in finding.all_citations:
+            medicine = names.get(citation.nregistro, "Medicine")
+            add(Block("source", f"{medicine} (reg. {citation.nregistro}), {_section_label(citation.seccion)}",
+                      label="Source",
+                      url=cima_source_url(citation.nregistro)))
+            add(Block("quote", citation.literal_quote))
+
 
     # Header
     meta = [
@@ -256,6 +320,10 @@ def generate_report(
         add(Block("note", "This report checks a proposed medicine against the patient's current "
                           "medicines, using the official technical sheets. It informs the "
                           "prescriber; it is not a decision."))
+        add(Block("note",
+            "Scope: findings concern the proposed medicine and its relationship "
+            "to current medicines. Run a full medication review to assess "
+            "existing medication concerns separately."))
     else:
         add(Block("title", "Medication review report"))
         meta.append(("Medicines reviewed",
@@ -263,13 +331,28 @@ def generate_report(
         add(Block("meta", items=meta))
     if sample:
         add(Block("banner", SAMPLE_BANNER, label="Sample data."))
+    if patient.contexto_clinico:
+        add(Block("h2", "Supplied patient context"))
+        add(Block("para", patient.contexto_clinico))
+
+    if question:
+        add(Block("h2", "Doctor's question"))
+        add(Block("para", question))
+        add(Block("h2", "Answer"))
+        if answer:
+            add_finding(Finding(tipo="informacion", descripcion=answer,
+                                citations=list(answer_citations)))
+        for finding in supporting_findings:
+            add(Block("h3", "Supporting check"))
+            add_finding(finding)
+        add(Block("h2", "Full supporting review"))
 
     # Summary
     add(Block("h2", "Summary"))
     summary_rows = [[title, "Not checked" if tipo in unchecked else str(counts[tipo])]
                     for tipo, title, _ in FINDING_SECTIONS]
     if not_found:
-        summary_rows.append(["Pairs checked with no information found", str(len(not_found))])
+        summary_rows.append(["Directional evidence checks with no information found", str(len(not_found))])
     if failed:
         summary_rows.append(["Checks that could not be completed", str(len(failed))])
     add(Block("table", header=["Check", "Result"], rows=summary_rows))
@@ -296,23 +379,35 @@ def generate_report(
         if not items and tipo in unchecked:
             add(Block("note", "Not checked: this part of the system was not available for this report."))
         elif not items:
-            add(Block("para", "None found."))
+            if tipo == "interaccion":
+                add(Block("para",
+                    "No interaction alerts were generated from the available checks. "
+                    "This does not establish that the combination is safe."))
+            else:
+                add(Block("para", "None found."))
         for i, finding in enumerate(items, start=1):
             if len(items) > 1:
                 add(Block("h3", f"Finding {number}.{i}"))
-            text = screened(finding.descripcion, f"{tipo} description")
-            add(Block("para", text) if text else Block("note", WITHHELD_TEXT))
-            if finding.cita:
-                c = finding.cita
-                medicine = names.get(c.nregistro, "Medicine")
-                add(Block("source", f"{medicine} (reg. {c.nregistro}), {_section_label(c.seccion)}",
-                          label="Source"))
-                add(Block("quote", c.literal_quote))
+            add_finding(finding)
         if tipo == "interaccion" and not_found:
-            add(Block("h3", "Pairs checked with no information found"))
-            add(Block("bullets", items=not_found))
+            add(Block("h3", "Directional evidence checks with no information found"))
+            grouped = {}
+            for entry in not_found:
+                grouped[entry] = grouped.get(entry, 0) + 1
+            add(Block("bullets", items=[
+                f"{entry} ({count} directional checks)" if count > 1
+                else entry
+                for entry, count in grouped.items()
+            ]))
             add(Block("note", "No information in the available documents does not mean "
                               "the combination is safe."))
+
+    if information:
+        add(Block("h2", "Documented information (not interaction alerts)"))
+        add(Block("note", "The source describes no interaction under its stated conditions. "
+                          "This does not establish the overall safety of the combination."))
+        for finding in information:
+            add_finding(finding)
 
     # Checks that did not finish (never shown as "nothing found")
     if failed:
@@ -386,7 +481,8 @@ def render_markdown(blocks: list[Block]) -> str:
         elif b.kind == "numbered":
             out.append("\n".join(f"{n}. {_md(i)}" for n, i in enumerate(b.items, start=1)))
         elif b.kind == "source":
-            out.append(f"**{_md(b.label)}:** {_md(b.text)}")
+            link = f" ? [Open CIMA technical sheet]({b.url})" if b.url else ""
+            out.append(f"**{_md(b.label)}:** {_md(b.text)}" + link)
         elif b.kind == "quote":
             out.append(f"> “{_md(b.text)}”")
         elif b.kind == "footer":
@@ -400,7 +496,7 @@ def render_markdown(blocks: list[Block]) -> str:
 
 def save_report(report: Report, output_dir: str | Path = OUTPUT_DIR) -> dict[str, Path]:
     """Save the report to output/ as PDF and as a web page. Returns the paths."""
-    from src.exportar import render_html, render_pdf  # local import: optional PDF library
+    from src.Reports.exportar import render_html, render_pdf  # local import: optional PDF library
 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)

@@ -11,7 +11,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from src import busqueda
+from src.Rag import busqueda
 
 
 @pytest.fixture

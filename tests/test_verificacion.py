@@ -1,8 +1,7 @@
 
 """Tests for CIMA citation verification."""
 
-from src.modelos import Citation, Fragment
-from src.verificacion import verificar_cita
+from src.Rag.verificacion import Citation, Fragment, verificar_cita
 
 
 def test_valid_quote():

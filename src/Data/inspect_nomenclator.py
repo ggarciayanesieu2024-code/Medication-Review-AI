@@ -13,17 +13,14 @@ What it does:
 It only reads files. It does not change any data.
 
 Run from the project root:
-    python src/inspect_nomenclator.py
+    python -m src.Data.inspect_nomenclator
 """
 
 import xml.etree.ElementTree as ET
 from collections import Counter
 
 
-if __package__:
-    from src.config import NOMENCLATOR_DIR, NOMENCLATOR_XML_FILE
-else:
-    from config import NOMENCLATOR_DIR, NOMENCLATOR_XML_FILE
+from src.config import NOMENCLATOR_DIR, NOMENCLATOR_XML_FILE
 
 
 # How many levels of nested XML tags to print.

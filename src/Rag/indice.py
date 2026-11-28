@@ -19,7 +19,7 @@ the complete text is still stored in ChromaDB.
 This script does not detect interactions or call the language model.
 
 Run from the project root:
-    python src/indice.py
+    python -m src.Rag.indice
 """
 
 import json
@@ -27,31 +27,18 @@ import json
 import chromadb
 from sentence_transformers import SentenceTransformer
 
-# Support both `python -m src.indice` and `python src/indice.py`.
-if __package__:
-    from src.config import (
-        COLLECTION_NAME,
-        DATABASE_DIR,
-        DISTANCE_METRIC,
-        EMBEDDING_BATCH_SIZE,
-        EMBEDDING_DEVICE,
-        EMBEDDING_MODEL,
-        FRAGMENTS_FILE,
-        MODEL_CACHE_DIR,
-        NORMALIZE_EMBEDDINGS,
-    )
-else:
-    from config import (
-        COLLECTION_NAME,
-        DATABASE_DIR,
-        DISTANCE_METRIC,
-        EMBEDDING_BATCH_SIZE,
-        EMBEDDING_DEVICE,
-        EMBEDDING_MODEL,
-        FRAGMENTS_FILE,
-        MODEL_CACHE_DIR,
-        NORMALIZE_EMBEDDINGS,
-    )
+# Run from the project root with python -m src.Rag.indice.
+from src.config import (
+    COLLECTION_NAME,
+    DATABASE_DIR,
+    DISTANCE_METRIC,
+    EMBEDDING_BATCH_SIZE,
+    EMBEDDING_DEVICE,
+    EMBEDDING_MODEL,
+    FRAGMENTS_FILE,
+    MODEL_CACHE_DIR,
+    NORMALIZE_EMBEDDINGS,
+)
 
 
 def main() -> None:

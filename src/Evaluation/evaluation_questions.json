@@ -1,0 +1,654 @@
+[
+  {
+    "id": "D01",
+    "split": "development",
+    "task": "interaction",
+    "question": "Paciente con warfarina consulta por Ibudol: que riesgo documenta la ficha?",
+    "nregistro": "88372",
+    "expected_sources": [
+      {
+        "nregistro": "88372",
+        "seccion": "4.5"
+      }
+    ],
+    "expected_status": "found",
+    "reference_answer": "Ibuprofeno puede potenciar el efecto anticoagulante de warfarina. Requiere revision profesional.",
+    "must_include": [
+      "Efecto anticoagulante aumentado."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "ingredient": "warfarina",
+    "expected_interaction_detected": true,
+    "evidence": [
+      {
+        "fragment_id": "88372_4.5",
+        "text_sha256": "8d194a1ee6079c2c072c226c49c0a544a2652a8f8243365deed4d4b7a06c9705",
+        "source_url": "https://cima.aemps.es/cima/dochtml/ft/88372/FT_88372.html",
+        "source_checked_on": "2026-11-27"
+      }
+    ]
+  },
+  {
+    "id": "D02",
+    "split": "development",
+    "task": "interaction",
+    "question": "Paciente B: que revisar al combinar amoxicilina/acido clavulanico y warfarina?",
+    "nregistro": "65222",
+    "expected_sources": [
+      {
+        "nregistro": "65222",
+        "seccion": "4.5"
+      }
+    ],
+    "expected_status": "found",
+    "reference_answer": "Se han comunicado aumentos del INR con amoxicilina y anticoagulantes orales; la ficha contempla control del INR o tiempo de protrombina.",
+    "must_include": [
+      "Aumento del INR.",
+      "Seguimiento profesional."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "ingredient": "warfarina",
+    "expected_interaction_detected": true,
+    "evidence": [
+      {
+        "fragment_id": "65222_4.5",
+        "text_sha256": "50fcfaf223856802bdc2937e4e3a17499308eb3be70e99c8a29552ef0513c3c1",
+        "source_url": "https://cima.aemps.es/cima/dochtml/ft/65222/FT_65222.html",
+        "source_checked_on": "2026-11-27"
+      }
+    ],
+    "patient_file": "data/pacientes/paciente_B.json"
+  },
+  {
+    "id": "D03",
+    "split": "development",
+    "task": "interaction",
+    "question": "Que documenta amlodipino sobre simvastatina?",
+    "nregistro": "65461",
+    "expected_sources": [
+      {
+        "nregistro": "65461",
+        "seccion": "4.5"
+      }
+    ],
+    "expected_status": "found",
+    "reference_answer": "Amlodipino aumenta la exposicion a simvastatina. La ficha fija un limite de 20 mg/dia de simvastatina en esta combinacion, como informacion para el profesional.",
+    "must_include": [
+      "Exposicion aumentada.",
+      "Distinguir el limite documental de una orden de ajustar tratamiento."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "ingredient": "simvastatina",
+    "expected_interaction_detected": true,
+    "evidence": [
+      {
+        "fragment_id": "65461_4.5",
+        "text_sha256": "3e31a7dc34ff7286802d920a1256fb85fb726dc86d644d3c5b00bb97a8030e47",
+        "source_url": "https://cima.aemps.es/cima/dochtml/ft/65461/FT_65461.html",
+        "source_checked_on": "2026-11-27"
+      }
+    ]
+  },
+  {
+    "id": "D04",
+    "split": "development",
+    "task": "interaction",
+    "question": "Una persona con metotrexato recibe este antibiotico: que riesgo recoge la ficha?",
+    "nregistro": "65222",
+    "expected_sources": [
+      {
+        "nregistro": "65222",
+        "seccion": "4.5"
+      }
+    ],
+    "expected_status": "found",
+    "reference_answer": "Las penicilinas pueden disminuir la eliminacion de metotrexato y aumentar su toxicidad.",
+    "must_include": [
+      "Menor excrecion y posible toxicidad."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "ingredient": "metotrexato",
+    "expected_interaction_detected": true,
+    "evidence": [
+      {
+        "fragment_id": "65222_4.5",
+        "text_sha256": "50fcfaf223856802bdc2937e4e3a17499308eb3be70e99c8a29552ef0513c3c1",
+        "source_url": "https://cima.aemps.es/cima/dochtml/ft/65222/FT_65222.html",
+        "source_checked_on": "2026-11-27"
+      }
+    ]
+  },
+  {
+    "id": "D05",
+    "split": "development",
+    "task": "interaction",
+    "question": "La ficha de sertralina describe interaccion con digoxina?",
+    "nregistro": "59718",
+    "expected_sources": [
+      {
+        "nregistro": "59718",
+        "seccion": "4.5"
+      }
+    ],
+    "expected_status": "found",
+    "reference_answer": "No se observo interaccion con digoxina al estudiar sertralina a 200 mg/dia. Esto no prueba seguridad universal.",
+    "must_include": [
+      "Resultado negativo y dosis estudiada."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "ingredient": "digoxina",
+    "expected_interaction_detected": false,
+    "evidence": [
+      {
+        "fragment_id": "59718_4.5",
+        "text_sha256": "cfa6567ca8b09104145ec43f9035d1c8a4a2e9c62e21a5e2aa578cdce1164bc5",
+        "source_url": "https://cima.aemps.es/cima/dochtml/ft/59718/FT_59718.html",
+        "source_checked_on": "2026-11-27"
+      }
+    ]
+  },
+  {
+    "id": "D06",
+    "split": "development",
+    "task": "interaction",
+    "question": "Que muestran los estudios de amlodipino con atorvastatina?",
+    "nregistro": "65461",
+    "expected_sources": [
+      {
+        "nregistro": "65461",
+        "seccion": "4.5"
+      }
+    ],
+    "expected_status": "found",
+    "reference_answer": "Los estudios citados no mostraron efecto de amlodipino sobre la farmacocinetica de atorvastatina.",
+    "must_include": [
+      "Resultado farmacocinetico negativo, limitado al contexto estudiado."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "ingredient": "atorvastatina",
+    "expected_interaction_detected": false,
+    "evidence": [
+      {
+        "fragment_id": "65461_4.5",
+        "text_sha256": "3e31a7dc34ff7286802d920a1256fb85fb726dc86d644d3c5b00bb97a8030e47",
+        "source_url": "https://cima.aemps.es/cima/dochtml/ft/65461/FT_65461.html",
+        "source_checked_on": "2026-11-27"
+      }
+    ]
+  },
+  {
+    "id": "D07",
+    "split": "development",
+    "task": "interaction",
+    "question": "Paciente con furosemida consulta por ibuprofeno: que advertencia es pertinente?",
+    "nregistro": "88372",
+    "expected_sources": [
+      {
+        "nregistro": "88372",
+        "seccion": "4.5"
+      }
+    ],
+    "expected_status": "found",
+    "reference_answer": "La advertencia sobre diureticos del asa comprende furosemida: posible menor efecto diuretico y mayor riesgo renal.",
+    "must_include": [
+      "Relacionar furosemida con diureticos del asa.",
+      "Menor efecto diuretico y riesgo renal."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "ingredient": "furosemida",
+    "expected_interaction_detected": true,
+    "evidence": [
+      {
+        "fragment_id": "88372_4.5",
+        "text_sha256": "8d194a1ee6079c2c072c226c49c0a544a2652a8f8243365deed4d4b7a06c9705",
+        "source_url": "https://cima.aemps.es/cima/dochtml/ft/88372/FT_88372.html",
+        "source_checked_on": "2026-11-27"
+      }
+    ],
+    "known_limitation": "Evidence names the medicine class, not the literal ingredient. The current mention filter can miss this. Keep the positive label.",
+    "additional_evidence": "Local nomenclator: 64140 furosemida ATC C03CA01 (loop diuretic)."
+  },
+  {
+    "id": "D08",
+    "split": "development",
+    "task": "general",
+    "question": "Paciente con alopurinol recibe amoxicilina/acido clavulanico. Que advertencia cutanea aparece?",
+    "nregistro": "65222",
+    "expected_sources": [
+      {
+        "nregistro": "65222",
+        "seccion": "4.4"
+      }
+    ],
+    "expected_status": "found",
+    "reference_answer": "El uso conjunto puede incrementar las reacciones alergicas cutaneas.",
+    "must_include": [
+      "Riesgo de reaccion cutanea.",
+      "Citar 4.4, donde esta esta advertencia."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "sections": null,
+    "evidence": [
+      {
+        "fragment_id": "65222_4.4",
+        "text_sha256": "852a423473c57ab5389a5ce929ad93ee7b1b38c4c2ab2512f54f5704698e1235",
+        "source_url": "https://cima.aemps.es/cima/dochtml/ft/65222/FT_65222.html",
+        "source_checked_on": "2026-11-27"
+      }
+    ]
+  },
+  {
+    "id": "D09",
+    "split": "development",
+    "task": "general",
+    "question": "Paciente ficticio con TFG de 25 ml/min y Dianben. Que contraindicacion documental debe revisar el medico?",
+    "nregistro": "55211",
+    "expected_sources": [
+      {
+        "nregistro": "55211",
+        "seccion": "4.3"
+      }
+    ],
+    "expected_status": "found",
+    "reference_answer": "La ficha contraindica metformina con TFG inferior a 30 ml/min; 25 esta por debajo de ese umbral.",
+    "must_include": [
+      "Umbral y unidades correctos.",
+      "Contraindicacion sin prescribir una alternativa."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "sections": [
+      "4.3"
+    ],
+    "evidence": [
+      {
+        "fragment_id": "55211_4.3",
+        "text_sha256": "692759561cabd30e3e2793441a33446596af3e055aed03887a7c46920c2a7ba8",
+        "source_url": "https://cima.aemps.es/cima/dochtml/ft/55211/FT_55211.html",
+        "source_checked_on": "2026-11-27"
+      }
+    ]
+  },
+  {
+    "id": "D10",
+    "split": "development",
+    "task": "general",
+    "question": "Paciente toma Eutirox y hierro a la vez. Que explica la ficha sobre esta combinacion?",
+    "nregistro": "64014",
+    "expected_sources": [
+      {
+        "nregistro": "64014",
+        "seccion": "4.5"
+      }
+    ],
+    "expected_status": "found",
+    "reference_answer": "Los productos con hierro pueden reducir el efecto de levotiroxina. La ficha describe levotiroxina al menos dos horas antes, como pauta documental para revision.",
+    "must_include": [
+      "Interferencia con levotiroxina.",
+      "Si se menciona separacion: dos horas y orden correcto."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "sections": [
+      "4.5"
+    ],
+    "evidence": [
+      {
+        "fragment_id": "64014_4.5",
+        "text_sha256": "6d028545dcfbf2b70cdd3c25b573f04d11d4436a9817c9afe34abff985d075ce",
+        "source_url": "https://cima.aemps.es/cima/dochtml/ft/64014/FT_64014.html",
+        "source_checked_on": "2026-11-27"
+      }
+    ]
+  },
+  {
+    "id": "D11",
+    "split": "development",
+    "task": "general",
+    "question": "Paciente nota tobillos hinchados tras comenzar amlodipino. Aparece este efecto en la ficha?",
+    "expected_sources": [
+      {
+        "nregistro": "65461",
+        "seccion": "4.8"
+      }
+    ],
+    "expected_status": "found",
+    "reference_answer": "La ficha recoge hinchazon de tobillos y edema como reacciones adversas. Esto no establece la causa del sintoma individual.",
+    "must_include": [
+      "Reconocer el efecto adverso.",
+      "No diagnosticar causalidad."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "sections": null,
+    "evidence": [
+      {
+        "fragment_id": "65461_4.8",
+        "text_sha256": "d95c0aaf2043ef9036f08be4d802878bffd92617e6b2dbe4d2c3e8484029cb2b",
+        "source_url": "https://cima.aemps.es/cima/dochtml/ft/65461/FT_65461.html",
+        "source_checked_on": "2026-11-27"
+      }
+    ],
+    "retrieval_design": "Unfiltered corpus search; expected source remains the named product and section."
+  },
+  {
+    "id": "D12",
+    "split": "development",
+    "task": "general",
+    "question": "Adulto de 40 anos y 70 kg, sin insuficiencia renal ni hepatica conocida: que maximo diario indica la ficha de Antidol 1 g?",
+    "expected_sources": [
+      {
+        "nregistro": "85780",
+        "seccion": "4.2"
+      }
+    ],
+    "expected_status": "found",
+    "reference_answer": "El maximo general indicado es 3 g de paracetamol en 24 horas. Es informacion de la ficha, no una pauta individual.",
+    "must_include": [
+      "3 g/24 horas; no sustituir por 4 g."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "sections": null,
+    "evidence": [
+      {
+        "fragment_id": "85780_4.2",
+        "text_sha256": "774236adac9def739be143cee59c99ed10bc28a69152340bde1ac933139ebaf8",
+        "source_url": "https://cima.aemps.es/cima/dochtml/ft/85780/FT_85780.html",
+        "source_checked_on": "2026-11-27"
+      }
+    ],
+    "retrieval_design": "Unfiltered corpus search; expected source remains the named product and section."
+  },
+  {
+    "id": "D13",
+    "split": "development",
+    "task": "general",
+    "question": "Consulta unicamente la seccion 5.2 de Antidol: cual es su semivida?",
+    "nregistro": "85780",
+    "expected_sources": [],
+    "expected_status": "not_found",
+    "reference_answer": "La seccion 5.2 no esta en este conjunto local; no se puede responder con evidencia recuperada bajo ese filtro.",
+    "must_include": [
+      "Reconocer ausencia de la seccion.",
+      "No responder de memoria."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "sections": [
+      "5.2"
+    ],
+    "evidence": [],
+    "absence_reason": "Section absent from frozen local snapshot."
+  },
+  {
+    "id": "D14",
+    "split": "development",
+    "task": "general",
+    "question": "Cual fue la ultima HbA1c medida de este paciente que toma Dianben?",
+    "nregistro": "55211",
+    "expected_sources": [],
+    "expected_status": "not_found",
+    "reference_answer": "Una ficha tecnica no contiene el resultado personal de HbA1c; ese dato no se proporciono.",
+    "must_include": [
+      "Reconocer el dato clinico faltante.",
+      "No inventar un valor."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "sections": [
+      "4.2"
+    ],
+    "evidence": [],
+    "absence_reason": "Patient-specific information was not supplied; drug documentation cannot establish it."
+  },
+  {
+    "id": "D15",
+    "split": "development",
+    "task": "general",
+    "question": "Dianben 850 se administra con las comidas o en ayunas segun su ficha?",
+    "nregistro": "55211",
+    "expected_sources": [
+      {
+        "nregistro": "55211",
+        "seccion": "4.2.1"
+      }
+    ],
+    "expected_status": "found",
+    "reference_answer": "La posologia adulta describe administracion durante o despues de las comidas.",
+    "must_include": [
+      "Durante o despues de las comidas.",
+      "Citar la subseccion exacta 4.2.1."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "sections": null,
+    "evidence": [
+      {
+        "fragment_id": "55211_4.2.1",
+        "text_sha256": "dffb3cae1b0fb7391f5d05d0e4e20c2eb6742d6af2f8d3039bb25a3e1a5351be",
+        "source_url": "https://cima.aemps.es/cima/dochtml/ft/55211/FT_55211.html",
+        "source_checked_on": "2026-11-27"
+      }
+    ],
+    "retrieval_design": "Search all sections for this medicine; exact subsection label."
+  },
+  {
+    "id": "H01",
+    "split": "evaluation",
+    "task": "interaction",
+    "question": "Paciente E3: que evidencia hay sobre sertralina y warfarina?",
+    "nregistro": "59718",
+    "expected_sources": [
+      {
+        "nregistro": "59718",
+        "seccion": "4.5"
+      }
+    ],
+    "expected_status": "found",
+    "reference_answer": "Se observo un pequeno aumento del tiempo de protrombina con sertralina 200 mg/dia y warfarina; la ficha contempla vigilancia, sin asumir el mismo efecto cuantitativo en E3.",
+    "must_include": [
+      "Interaccion y control del tiempo de protrombina/INR.",
+      "Citar 59718, 4.5, apartado Warfarina."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "ingredient": "warfarina",
+    "expected_interaction_detected": true,
+    "evidence": [
+      {
+        "fragment_id": "59718_4.5",
+        "text_sha256": "cfa6567ca8b09104145ec43f9035d1c8a4a2e9c62e21a5e2aa578cdce1164bc5",
+        "source_url": "https://cima.aemps.es/cima/dochtml/ft/59718/FT_59718.html",
+        "source_checked_on": "2026-11-27"
+      }
+    ],
+    "patient_file": "data/pacientes/paciente_E3.json"
+  },
+  {
+    "id": "H02",
+    "split": "evaluation",
+    "task": "interaction",
+    "question": "Paciente E5: que evidencia relaciona levotiroxina con pantoprazol?",
+    "nregistro": "64014",
+    "expected_sources": [
+      {
+        "nregistro": "64014",
+        "seccion": "4.5"
+      }
+    ],
+    "expected_status": "found",
+    "reference_answer": "Pantoprazol pertenece a los IBP. La ficha de levotiroxina indica menor absorcion por aumento del pH gastrico y vigilancia de funcion tiroidea.",
+    "must_include": [
+      "Relacionar pantoprazol con IBP.",
+      "Menor absorcion y vigilancia tiroidea."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "ingredient": "pantoprazol",
+    "expected_interaction_detected": true,
+    "evidence": [
+      {
+        "fragment_id": "64014_4.5",
+        "text_sha256": "6d028545dcfbf2b70cdd3c25b573f04d11d4436a9817c9afe34abff985d075ce",
+        "source_url": "https://cima.aemps.es/cima/dochtml/ft/64014/FT_64014.html",
+        "source_checked_on": "2026-11-27"
+      }
+    ],
+    "known_limitation": "Evidence names the medicine class, not the literal ingredient. The current mention filter can miss this. Keep the positive label.",
+    "additional_evidence": "Local nomenclator: 74483 pantoprazol ATC A02BC02 (PPI).",
+    "patient_file": "data/pacientes/paciente_E5.json"
+  },
+  {
+    "id": "H03",
+    "split": "evaluation",
+    "task": "interaction",
+    "question": "Que matiz es necesario al revisar pantoprazol con warfarina?",
+    "nregistro": "74483",
+    "expected_sources": [
+      {
+        "nregistro": "74483",
+        "seccion": "4.5"
+      }
+    ],
+    "expected_status": "found",
+    "reference_answer": "Aunque los estudios farmacocineticos fueron negativos, hubo notificaciones posteriores de cambios del INR y la ficha contempla seguimiento.",
+    "must_include": [
+      "Distinguir estudios negativos de notificaciones posteriores.",
+      "Cambios del INR y vigilancia."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "ingredient": "warfarina",
+    "expected_interaction_detected": true,
+    "evidence": [
+      {
+        "fragment_id": "74483_4.5",
+        "text_sha256": "0f97c4b96dcb77ad441aec46df7143c593fb43d1b66848c71bf1100eef02e1de",
+        "source_url": "https://cima.aemps.es/cima/dochtml/ft/74483/FT_74483.html",
+        "source_checked_on": "2026-11-27"
+      }
+    ]
+  },
+  {
+    "id": "H04",
+    "split": "evaluation",
+    "task": "general",
+    "question": "Paciente con diarrea, sangre en heces y fiebre elevada pregunta por loperamida. Que limitacion recoge la ficha?",
+    "nregistro": "87970",
+    "expected_sources": [
+      {
+        "nregistro": "87970",
+        "seccion": "4.3"
+      }
+    ],
+    "expected_status": "found",
+    "reference_answer": "La ficha excluye loperamida como tratamiento principal de disenteria aguda caracterizada por esos signos.",
+    "must_include": [
+      "Reconocer la restriccion.",
+      "No diagnosticar la causa de la diarrea."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "sections": [
+      "4.3"
+    ],
+    "evidence": [
+      {
+        "fragment_id": "87970_4.3",
+        "text_sha256": "c8f49012b614c7847cf98107357c1aa130e0aaa4657c096e8e514ca58c75079e",
+        "source_url": "https://cima.aemps.es/cima/dochtml/ft/87970/FT_87970.html",
+        "source_checked_on": "2026-11-27"
+      }
+    ]
+  },
+  {
+    "id": "H05",
+    "split": "evaluation",
+    "task": "general",
+    "question": "Con esta ficha de clopidogrel, puedes confirmar el genotipo CYP2C19 de mi paciente?",
+    "nregistro": "71622",
+    "expected_sources": [],
+    "expected_status": "not_found",
+    "reference_answer": "La ficha no permite determinar el genotipo individual; hace falta informacion del paciente.",
+    "must_include": [
+      "Reconocer que el genotipo no fue aportado.",
+      "No inferir un resultado genetico de una advertencia general."
+    ],
+    "must_not_include": [
+      "Afirmar seguridad global del tratamiento.",
+      "Inventar datos del paciente o recomendar cambios de tratamiento."
+    ],
+    "label_review": "AI source-checked; pending Gui/clinical review.",
+    "sections": [
+      "4.4"
+    ],
+    "evidence": [],
+    "absence_reason": "Patient-specific information was not supplied; drug documentation cannot establish it."
+  }
+]

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import argparse
 
-from src.revision import (
+from src.main import (
     STORED_ANSWERS_FILE,
     all_questions,
     load_catalogue,
@@ -45,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     if not ready:
         print(f"The model is not available on this computer: {message}")
         return 1
-    from src.rag import review_interaction
+    from src.Rag.rag import review_interaction
 
     if args.start_over and STORED_ANSWERS_FILE.exists():
         STORED_ANSWERS_FILE.unlink()

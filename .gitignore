@@ -10,6 +10,7 @@ __pycache__/
 .ruff_cache/
 .vscode/
 .idea/
+.ipynb_checkpoints/
 
 # Local vector index and model caches.
 .chroma/
@@ -21,3 +22,6 @@ data/processed/
 .venv/
 data/raw/cima/
 data/embeddings/
+
+# Generated reports
+output/
