@@ -51,15 +51,16 @@ For a standalone question without a patient, callers use
 ``src.Rag.rag.answer_question(question, nregistro=None, sections=None, ...)``.
 The notebook splits that same operation into preparation and generation so
 the retrieved evidence and exact prompt can be inspected before a model call.
-The current website still needs a separate UI route to expose standalone
-questions; ``review_request`` requires a Patient.
+The website exposes standalone questions separately; ``review_request`` requires a Patient.
 """
 from __future__ import annotations
 
 import json
 import os
+import time
 from dataclasses import dataclass, field
 from functools import partial
+from datetime import date
 from itertools import combinations
 from pathlib import Path
 from typing import Callable
@@ -69,6 +70,7 @@ from src.Rag.verificacion import Citation
 from src.Reports.informe import Finding, Medication, Patient, normalise_text
 
 CATALOGUE_FILE = DATA_DIR / "catalogo_medicamentos.json"
+STORED_ANSWERS_FILE = DATA_DIR / "interacciones_guardadas.json"
 
 REASON_TEXT = {
     "forbidden_phrase": "the model's answer was blocked by the safety check",
@@ -76,6 +78,8 @@ REASON_TEXT = {
     "invalid_response": "the model's answer was not in the expected format",
     "generation_failed": "the model could not be reached",
     "context_too_large": "the evidence exceeds the model request-size limit",
+    "legacy_unclassified": "the historical answer requires updated interaction classification",
+    "not_stored": "this search is not in the stored model answers",
 }
 
 Progress = Callable[[int, int, str], None]
@@ -89,6 +93,7 @@ class CatalogueEntry:
     nombre: str
     principios_activos: list[str]
     ficha: bool
+    atc: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -130,6 +135,7 @@ def load_catalogue(path: str | Path = CATALOGUE_FILE) -> dict[str, CatalogueEntr
             nombre=item["nombre"],
             principios_activos=list(item["principios_activos"]),
             ficha=bool(item["ficha"]),
+            atc=list(item.get("atc", [])),
         )
         for item in data["medicamentos"]
     }
@@ -168,17 +174,145 @@ def rules_status(prescriptions_file: Path = PRESCRIPTIONS_FILE) -> tuple[bool, s
     except Exception as exc:  # a SyntaxError or ImportError inside src/Cascades/reglas.py
         return False, f"src/Cascades/reglas.py could not be loaded ({type(exc).__name__}: {exc})."
     if not Path(prescriptions_file).exists():
-        return False, (
-            "data/processed/prescriptions.json is missing. It is made by "
-            "python -m src.Data.download_nomenclator and python -m src.Data.parse_nomenclator."
+        return True, (
+            "connected, using the ATC codes in the medicine list "
+            "(data/processed/prescriptions.json was not found)"
         )
-    return True, "connected"
+    return True, "connected, using the nomenclator codes"
 
 
-def load_rule_data(prescriptions_file: Path = PRESCRIPTIONS_FILE) -> tuple[dict, dict]:
-    """Load medicine codes and the validated cascade table through the rules module."""
+def load_rule_data(
+    prescriptions_file: Path = PRESCRIPTIONS_FILE,
+    catalogue: dict[str, CatalogueEntry] | None = None,
+) -> tuple[dict, dict]:
+    """(drug codes per registration number, cascade table) for the rules.
+
+    Uses the nomenclator file when it exists. Otherwise builds the codes from the
+    medicine list: its ATC codes, and its ingredient names in place of the
+    nomenclator ingredient codes (the rules only compare them for equality).
+    """
     from src.Cascades import reglas
-    return reglas.load_drug_info(Path(prescriptions_file)), reglas.load_cascades()
+    if Path(prescriptions_file).exists():
+        drug_info = reglas.load_drug_info(Path(prescriptions_file))
+    else:
+        catalogue = catalogue if catalogue is not None else load_catalogue()
+        drug_info = {
+            n: {"atc": list(e.atc),
+                "active_ingredients": [f"name:{normalise_text(i)}" for i in e.principios_activos]}
+            for n, e in catalogue.items() if e.atc
+        }
+    return drug_info, reglas.load_cascades()
+
+
+# --------------------------------------------------------------------------
+# Stored model answers (for computers without the model, such as the shared link)
+# --------------------------------------------------------------------------
+
+@dataclass
+class StoredAnswers:
+    generated_at: str
+    answers: dict[tuple[str, str], dict]
+
+
+def load_stored_answers(path: str | Path = STORED_ANSWERS_FILE) -> StoredAnswers | None:
+    """Read data/interacciones_guardadas.json, or None if it does not exist."""
+    path = Path(path)
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return StoredAnswers(
+        generated_at=data.get("generated_at", "an unknown date"),
+        answers={(a["sheet"], normalise_text(a["ingredient"])): a for a in data.get("answers", [])},
+    )
+
+
+def stored_review(stored: StoredAnswers) -> Callable[[str, str], dict]:
+    """A stand-in for review_interaction that answers from the stored file."""
+    def review(nregistro: str, ingredient: str) -> dict:
+        answer = stored.answers.get((nregistro, normalise_text(ingredient)))
+        if answer is None:
+            return {"status": "error", "reason": "not_stored", "response": None}
+        response = answer.get("response")
+        if answer["status"] == "found" and (
+            not isinstance(response, dict)
+            or type(response.get("interaction_detected")) is not bool
+        ):
+            return {
+                "status": "error",
+                "reason": "legacy_unclassified",
+                "response": None,
+            }
+        return {"status": answer["status"], "reason": answer.get("reason"),
+                "response": response}
+    return review
+
+
+def all_questions(catalogue: dict[str, CatalogueEntry]) -> list[tuple[str, str]]:
+    """Every (sheet, ingredient) search any patient or new medicine can need."""
+    ingredients: dict[str, str] = {}
+    for entry in catalogue.values():
+        for ingredient in entry.principios_activos:
+            ingredients.setdefault(normalise_text(ingredient), ingredient)
+    questions = []
+    for entry in sorted(catalogue.values(), key=lambda e: e.nregistro):
+        if not entry.ficha:
+            continue
+        own = {normalise_text(i) for i in entry.principios_activos}
+        questions += [(entry.nregistro, name) for key, name in sorted(ingredients.items()) if key not in own]
+    return questions
+
+
+def save_answers(
+    path: str | Path,
+    review: Callable[[str, str], dict],
+    questions: list[tuple[str, str]],
+    *,
+    pause: float = 0.0,
+    log: Callable[[str], None] = print,
+) -> dict[str, int]:
+    """Ask the questions not stored yet and save the answers after each one.
+
+    Found, not found and rejected answers are kept. Errors (for example the API
+    limit) are left out, so running the script again retries only those.
+    """
+    path = Path(path)
+    data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"answers": []}
+    stored = {(a["sheet"], normalise_text(a["ingredient"])) for a in data["answers"]}
+    counts = {"asked": 0, "skipped": 0, "kept": 0, "retry_later": 0}
+    total = len(questions)
+    for number, (sheet, ingredient) in enumerate(questions, start=1):
+        if (sheet, normalise_text(ingredient)) in stored:
+            counts["skipped"] += 1
+            continue
+        counts["asked"] += 1
+        try:
+            answer = review(sheet, ingredient)
+        except Exception as exc:
+            counts["retry_later"] += 1
+            log(f"[{number}/{total}] {sheet} / {ingredient}: failed ({type(exc).__name__}); run again later")
+            continue
+        status = answer.get("status")
+        if status not in ("found", "not_found", "rejected"):
+            counts["retry_later"] += 1
+            log(f"[{number}/{total}] {sheet} / {ingredient}: {status} ({answer.get('reason')}); run again later")
+            continue
+        data["answers"].append({
+            "sheet": sheet,
+            "ingredient": ingredient,
+            "status": status,
+            "reason": answer.get("reason"),
+            "response": answer.get("response"),
+            "sources": [{"nregistro": f.get("nregistro"), "seccion": f.get("seccion")}
+                        for f in answer.get("fragments") or [] if isinstance(f, dict)],
+        })
+        counts["kept"] += 1
+        data["generated_at"] = date.today().isoformat()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        log(f"[{number}/{total}] {sheet} / {ingredient}: {status}")
+        if pause and answer.get("fragments"):  # only searches that reached the model count
+            time.sleep(pause)
+    return counts
 
 
 # --------------------------------------------------------------------------

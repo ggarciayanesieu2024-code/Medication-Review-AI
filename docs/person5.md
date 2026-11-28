@@ -1,6 +1,6 @@
 # Person 5 - Interface, report and evaluation
 
-Last updated: 19 November 2026 (connected Person 2's rules; both tabs now use the real system when it is available).
+Last updated: 20 November 2026 (stored model answers and backup codes, so the shared link can show real results; safety tests).
 
 ## Status
 
@@ -8,7 +8,7 @@ Last updated: 19 November 2026 (connected Person 2's rules; both tabs now use th
 | --- | --- |
 | 1. Streamlit screen (`app.py`) | Done. Two tabs, **Review current medicines** and **Check a new medicine**, both using Person 2's rules and Person 3's model when available. |
 | 2. Report (`src/Reports/informe.py`, `src/Reports/exportar.py`) | Done. Saves PDF and web page to `output/`. |
-| 3. Safety cases and report tests | Report and check tests done (`tests/test_informe.py`, `tests/test_main.py`). `tests/fixtures/safety_cases.json` pending. |
+| 3. Safety cases and report tests | Report and check tests done (`tests/test_informe.py`, `tests/test_main.py`). Safety fixtures included, with documented known gaps. |
 | 4. 20 evaluation questions (`src/Evaluation/evaluation_questions.json`) | Prepared: 15 development and 5 reserved cases with source-checked draft expectations for review. |
 | 5. Metrics (`src/Evaluation/`) | RAG source/status/interaction scoring implemented in `evaluar.py`; answer relevance and patient-rule scenarios still require manual inspection. |
 | 6. Evaluation write-up | Pending. |
@@ -53,15 +53,17 @@ question adds planning and answer-generation calls to the usual review calls.
 
 The sidebar shows **System status** for each part, with the reason when a part is not available.
 
-| Part | Gives | Needs |
+| Part | Gives | Uses, in this order |
 | --- | --- | --- |
-| Rules (Person 2, `src/Cascades/reglas.py`) | Duplicates (shared active-ingredient code), same drug family (ATC), prescribing cascades | `data/processed/prescriptions.json`, made by `src/Data/download_nomenclator.py` and `src/Data/parse_nomenclator.py` |
-| Model (Person 3, `src.Rag.rag.review_interaction`) | Interactions quoted from the technical sheets | Full `requirements.txt`; the shared CIMA file from the team Drive saved as `data/processed/fragmentos_cima.json` and indexed with `python -m src.Rag.indice`; `GROQ_API_KEY` in `.env` |
+| Rules (Person 2, `src/Cascades/reglas.py`) | Duplicates, same drug family (ATC), prescribing cascades | 1. Nomenclator codes from `data/processed/prescriptions.json`. 2. If that file is missing, the ATC codes and ingredient names in `data/catalogo_medicamentos.json` |
+| Interactions (Person 3, `src.Rag.rag.review_interaction`) | What each technical sheet says about the other medicine, with the verified quotation | 1. The live model: full `requirements.txt`, the shared CIMA file saved as `data/processed/fragmentos_cima.json` and indexed with `python -m src.Rag.indice`, `GROQ_API_KEY` in `.env`. 2. Otherwise the stored answers in `data/interacciones_guardadas.json` |
 
 What happens when a part is missing:
-- **No rules:** duplicates fall back to comparing ingredient names from `data/catalogo_medicamentos.json`. Drug family and cascades show as **Not checked**.
-- **No model:** interactions show as **Not checked**.
-- **Neither part:** **Review current medicines** shows the sample findings under a **Sample data** banner, so the screen can still be demonstrated.
+- **No rules** (only if `src/Cascades/reglas.py` does not load): duplicates fall back to comparing ingredient names, and drug family and cascades show as **Not checked**.
+- **No model and no stored answers:** interactions show as **Not checked**.
+- **Neither part:** **Review current medicines** shows the sample findings under a **Sample data** banner.
+
+The sidebar summarises what the current version checks; **Technical details** gives the reasons.
 
 The report never says "None found" for something that was not checked.
 
@@ -84,11 +86,28 @@ Each model answer is one of three kinds, kept apart on purpose:
 
 `CheckResult.log` keeps one line per model question (sheet, ingredient, status, reason) for the metrics script.
 
+### Stored model answers (for the shared link)
+
+The shared link cannot run the model (no CIMA file, no key, no heavy libraries). Instead, someone with the model set up runs, once:
+
+```bash
+python -m src.guardar_interacciones
+```
+
+It asks the model every search any patient or new medicine can need (305 for the current medicine list: each technical sheet, searched for every other ingredient) and saves the answers in `data/interacciones_guardadas.json`. Then upload that file to GitHub (and **Sync fork** for the link).
+
+- **Rate limit:** questions that reach the model are spaced 2 seconds apart (`--pause`) to stay under Groq's free-tier limit. Searches with no matching fragment do not call the model.
+- **What is kept:** found, not found and rejected answers. Errors such as the API limit are not saved, so running the command again only retries those.
+- **When to rerun:** use `--start-over` after the CIMA file or the medicine list changes.
+
+The screen uses the stored answers whenever the live model is not available, and the report says when they were produced. They are the model's own verified answers, not sample data. Each answer also keeps the sections it was based on (`sources`), which the metrics script (deliverable 5) can use for retrieval success.
+
 ### The medicine list
 
 `data/catalogo_medicamentos.json` lists every medicine in the patient files with:
-- its active ingredients, in Spanish as the sheets write them (the interaction search looks for these names), and
-- whether the CIMA file has its technical sheet (`ficha`).
+- its active ingredients, in Spanish as the sheets write them (the interaction search looks for these names),
+- whether the CIMA file has its technical sheet (`ficha`), and
+- its WHO ATC code (`atc`), which the rules use when the nomenclator file is missing.
 
 `tests/test_main.py` checks that every patient medicine is in the list. On a computer with the CIMA file, it also checks that the `ficha` marks match the file. The list includes all patient medicines plus registration 87970 (loperamide), whose sheet is in the shared CIMA file. Missing-sheet tests explicitly simulate absent coverage so they remain valid when the real source coverage changes.
 
@@ -104,6 +123,42 @@ The shared link is deployed from Gabi's fork (`ggarciayanesieu2024-code/Medicati
 
 The entry point (**Main file path**) is `app_deploy/streamlit_app.py`. It runs `app.py`, and Community Cloud installs the full dependency list from the root `requirements.txt`, the same file used locally. Real rules and RAG still require the data, search index and API configuration described above; checks that cannot run remain marked **Not checked**.
 
+The application also supports historical stored interaction answers and catalogue-based ATC rules when the live resources are unavailable. Legacy unclassified interaction answers require another check.
+
+## Safety cases (deliverable 3)
+
+`tests/fixtures/safety_cases.json` holds 29 unsafe sentences (English and Spanish) that tell someone to start, stop or change a treatment, and 14 safe sentences that inform or ask. The tests in `tests/test_informe.py` check four things:
+
+1. The shared `FORBIDDEN_PHRASES` (`src/config.py`) catches each unsafe sentence, ignoring case, accents and extra spaces.
+2. It lets each safe sentence through, including medicine names such as "polvo para suspensión oral" and the report's own questions.
+3. When generated text is unsafe, the report withholds it and flags it, and the disclaimer still appears in the Markdown and the web page.
+4. The report and `src/Rag/rag.py` normalise text the same way. This test only runs where the model libraries are installed.
+
+### Results with the current list
+
+The current list has 10 exact phrases and catches **14 of the 29** unsafe sentences. It blocks none of the safe ones. The 15 it misses are marked `known_gap` and run as expected failures (XFAIL), so the suite stays green. They are mostly other ways of saying the same thing:
+- "Discontinue warfarin" and "Lower the dose of amlodipine"
+- infinitives such as "suspender", "dejar de tomar" and "reducir la dosis"
+- "Ajustar la dosis de warfarina según el INR", which Person 3 saw in a live answer
+
+Each gap test is strict, so when the list catches one of them, that test fails with XPASS as a reminder to set `known_gap` to `false`.
+
+### Suggested additions for Person 4
+
+These 18 phrases were checked against all the examples, the cascade questions in `data/cascadas.json` and the report's own wording:
+
+`discontinue`, `lower the dose`, `halve the`, `do not take`, `instead of`, `replace ` (with the space), `ajustar la dosis`, `ajuste la dosis`, `suspender`, `dejar de tomar`, `cambie a ` (with the space), `sustituya`, `retire la`, `retire el`, `iniciar tratamiento`, `inicie tratamiento`, `reducir la dosis`, `aumentar la dosis`
+
+With them, the list catches **28 of 29** unsafe sentences and still blocks no safe text. Adding `stop ` (with the space) catches the last one ("Stop ibuprofen…"). It is the broadest phrase, so it may also block sentences such as "the patient stopped…" in future texts.
+
+Phrases to avoid, because they block safe text:
+- `prescribe` (it also matches "prescribed by", used in every duplicate finding)
+- `ajuste de dosis` (it matches dose information quoted from section 4.2)
+
+### The trade-off with quoted text
+
+`src/Rag/rag.py` checks the forbidden phrases in the model's description **and** in the literal quotations from the technical sheets. A quotation is the official text, and sections 4.2 and 4.4 often contain wording like "debe suspenderse el tratamiento". The longer the list, the more real answers, including the dosage and contraindication questions in the evaluation, will be rejected because of their quotation. Checking only the description, as the report does, would avoid that. The safe examples marked `in_source_text` show the kind of sentences involved.
+
 ## Files
 
 | Path | What it is |
@@ -117,6 +172,10 @@ The entry point (**Main file path**) is `app_deploy/streamlit_app.py`. It runs `
 | `data/demo/hallazgos_ejemplo.json` | Sample findings, used only when neither the rules nor the model are available |
 | `tests/test_main.py` | Both tabs with a stand-in model and Person 2's real rules (with codes written in the test) |
 | `tests/test_informe.py` | Footer, structure, safety and download tests; development and evaluation patients kept apart |
+| `src/guardar_interacciones.py` | Generates stored interaction answers |
+| `data/interacciones_guardadas.json` | Historical stored answers |
+| `tests/fixtures/safety_cases.json` | Safety examples and known gaps |
+| `evaluacion/evaluar.py` | Earlier patient-level evaluator, retained for reconciliation |
 
 Run `uv pip install -r requirements.txt` to install the full project, including ReportLab for PDF export. The root file is the only requirements file and serves both local development and website deployment. Adding `output/` to `.gitignore` keeps saved reports out of Git.
 
@@ -163,5 +222,7 @@ The test compares registration numbers, so it would miss the same scenario with 
 - **ATC/statin case:** E4 expects no duplicate and no interaction. With Person 2's rules, E4 gets a same-family warning (C10AA). Agree whether that warning is expected before the evaluation.
 - **Patient format:** E1 to E6 use `expected_result` and `hypothesis`. E6 tests five-medicine/three-prescriber grouping and missing source coverage in the frozen benchmark snapshot.
 - **`FORBIDDEN_PHRASES` misses "ajustar la dosis",** which Person 3 observed in a live answer. The safety cases (deliverable 3) will include it.
+- **Safety coverage:** the historical safety evaluation identified 15 missed unsafe examples. These remain documented limitations.
+- **Stored answers:** refresh legacy responses using the newer interaction classification schema.
 - **Group names in the interaction search:** decide whether "AINE" or "anticoagulantes" should also be searched. It would find more, but answers would be less specific.
 - **Keep the evaluation fair:** do not tune prompts on the medicine pairs that evaluation patients E1 to E5 check (for example sertraline with warfarin).

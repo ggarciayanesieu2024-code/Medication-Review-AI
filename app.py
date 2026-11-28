@@ -33,10 +33,12 @@ from src.main import (
     check_new_medicine,
     load_catalogue,
     load_rule_data,
+    load_stored_answers,
     model_status,
     planned_questions,
     review_request,
     rules_status,
+    stored_review,
 )
 
 DEMO_DIR = PROJECT_ROOT / "data" / "demo"
@@ -76,9 +78,9 @@ def load_sample_findings() -> dict:
     return json.loads(SAMPLE_FINDINGS_FILE.read_text(encoding="utf-8"))
 
 
-@st.cache_resource(show_spinner="Loading the nomenclator codes…")
+@st.cache_resource(show_spinner="Loading the medicine codes…")
 def cached_rule_data():
-    return load_rule_data()
+    return load_rule_data(catalogue=load_catalogue())
 
 
 def saved_files(report) -> dict:
@@ -115,12 +117,14 @@ def show_report(report, files: dict, key: str) -> None:
     st.markdown(report.markdown)
 
 
-def what_runs(rules_ready: bool, model_ready: bool) -> str:
-    parts = []
-    parts.append("duplicates, drug families and cascades (rules)" if rules_ready
-                 else "duplicates by ingredient name only (rules not available)")
-    parts.append("interactions in the technical sheets (model)" if model_ready
-                 else "no interactions (model not available)")
+def what_runs(rules_ready: bool, interactions: str) -> str:
+    parts = ["duplicates, drug families and cascades" if rules_ready
+             else "duplicates by ingredient name only"]
+    parts.append({
+        "live": "interactions, asked to the model now",
+        "stored": "interactions, from the model's stored answers",
+        "off": "no interactions",
+    }[interactions])
     return "This check covers " + "; ".join(parts) + "."
 
 
@@ -462,9 +466,21 @@ rule_data = None
 if rules_ready:
     try:
         rule_data = cached_rule_data()
-    except Exception as exc:  # unreadable nomenclator file
-        rules_ready, rules_message = False, f"the nomenclator codes could not be read ({exc})."
-live = rules_ready or model_ready
+    except Exception as exc:  # unreadable codes file
+        rules_ready, rules_message = False, f"the medicine codes could not be read ({exc})."
+
+# Interactions: the live model, else the stored answers, else not checked.
+stored = None if model_ready else load_stored_answers()
+if model_ready:
+    interactions, review_fn, interaction_note = "live", None, None
+elif stored is not None:
+    interactions, review_fn = "stored", stored_review(stored)
+    interaction_note = (f"These answers were produced by the model on {stored.generated_at} and stored; "
+                        "these historical answers are not live searches. Legacy answers without interaction classification require another check.")
+else:
+    interactions, review_fn, interaction_note = "off", None, None
+use_model = interactions != "off"
+live = rules_ready or use_model
 
 with st.sidebar:
     st.divider()
@@ -482,6 +498,8 @@ with st.sidebar:
         st.info(f"Rules: not available. Reason: {rules_message}")
     if model_ready:
         st.success("AI configured")
+    elif interactions == "stored":
+        st.info("Using historical stored interaction answers")
     else:
         st.info(f"Model: not available. Reason: {model_message}")
     if not live:
@@ -552,7 +570,7 @@ with tab_review:
         max_chars=4000,
     ).strip()
     if live:
-        st.caption(what_runs(rules_ready, model_ready))
+        st.caption(what_runs(rules_ready, interactions))
         if model_ready:
             if question:
                 st.caption("The question will be interpreted, checked against the patient sheet, "
@@ -581,7 +599,9 @@ with tab_review:
                 bar, update = progress_bar()
                 request = review_request(
                     patient, catalogue, question, rule_data=rule_data,
-                    use_model=model_ready, progress=update,
+                    use_model=model_ready if question else use_model,
+                    review=None if question else review_fn,
+                    progress=update,
                 )
                 if request.clarification:
                     st.session_state.pop("result", None)
@@ -604,6 +624,7 @@ with tab_review:
                     answer=request.answer,
                     answer_citations=request.citations,
                     supporting_findings=request.supporting_findings,
+                    interaction_note=interaction_note,
                 )
             else:
                 entry = load_sample_findings().get(patient.id, {})
@@ -656,7 +677,7 @@ with tab_check:
     c1, c2 = st.columns(2)
     dose = c1.text_input("Dose (optional)", placeholder="1 g cada 8 horas")
     prescriber = c2.text_input("Prescriber (optional)", placeholder="Dra. Pérez (Atención Primaria)")
-    st.caption(what_runs(rules_ready, model_ready))
+    st.caption(what_runs(rules_ready, interactions))
 
     check_snapshot = (
         patient_snapshot,
@@ -679,7 +700,7 @@ with tab_check:
             try:
                 checked = check_new_medicine(
                     patient, proposed, catalogue,
-                    rule_data=rule_data, use_model=model_ready, progress=update,
+                    rule_data=rule_data, use_model=use_model, review=review_fn, progress=update,
                 )
                 report = generate_report(
                     patient,
@@ -688,6 +709,7 @@ with tab_check:
                     could_not_check=checked.could_not_check,
                     proposed=proposed,
                     unchecked_types=checked.unchecked,
+                    interaction_note=interaction_note,
                 )
                 st.session_state["check_result"] = {
                     "patient_id": patient.id, "report": report,

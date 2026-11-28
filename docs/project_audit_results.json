@@ -1,0 +1,360 @@
+{
+  "configuration": {
+    "model": "openai/gpt-oss-20b",
+    "reasoning_effort": "medium",
+    "retrieval_k": 5
+  },
+  "development": {
+    "cases": 15,
+    "source_hit": "13/13",
+    "status_match": "15/15",
+    "interaction_match": "7/7"
+  },
+  "held_out": {
+    "model": "openai/gpt-oss-20b",
+    "reasoning": "medium",
+    "k": 5,
+    "summary": {
+      "cases": 5,
+      "errors": 0,
+      "rejected": 0,
+      "source_hit": 0.75,
+      "source_hit_cases": 4,
+      "source_recall": 0.75,
+      "source_recall_cases": 4,
+      "status_match": 0.8,
+      "status_match_cases": 5,
+      "interaction_match": 0.6666666666666666,
+      "interaction_match_cases": 3,
+      "mean_seconds": 3.9466,
+      "median_seconds": 2.577,
+      "total_seconds": 19.733
+    },
+    "results": [
+      {
+        "id": "H01",
+        "case": {
+          "id": "H01",
+          "split": "evaluation",
+          "task": "interaction",
+          "question": "Paciente E3: que evidencia hay sobre sertralina y warfarina?",
+          "nregistro": "59718",
+          "expected_sources": [
+            {
+              "nregistro": "59718",
+              "seccion": "4.5"
+            }
+          ],
+          "expected_status": "found",
+          "reference_answer": "Se observo un pequeno aumento del tiempo de protrombina con sertralina 200 mg/dia y warfarina; la ficha contempla vigilancia, sin asumir el mismo efecto cuantitativo en E3.",
+          "must_include": [
+            "Interaccion y control del tiempo de protrombina/INR.",
+            "Citar 59718, 4.5, apartado Warfarina."
+          ],
+          "must_not_include": [
+            "Afirmar seguridad global del tratamiento.",
+            "Inventar datos del paciente o recomendar cambios de tratamiento."
+          ],
+          "label_review": "AI source-checked; pending Gui/clinical review.",
+          "ingredient": "warfarina",
+          "expected_interaction_detected": true,
+          "evidence": [
+            {
+              "fragment_id": "59718_4.5",
+              "text_sha256": "cfa6567ca8b09104145ec43f9035d1c8a4a2e9c62e21a5e2aa578cdce1164bc5",
+              "source_url": "https://cima.aemps.es/cima/dochtml/ft/59718/FT_59718.html",
+              "source_checked_on": "2026-11-27"
+            }
+          ],
+          "patient_file": "data/pacientes/paciente_E3.json"
+        },
+        "k": 5,
+        "status": "found",
+        "reason": null,
+        "fragments": [
+          {
+            "id": "59718_4.5",
+            "nombre": "BESITRAN 100 mg COMPRIMIDOS RECUBIERTOS CON PELICULA",
+            "seccion": "4.5",
+            "titulo": "Interacción con otros medicamentos y otras formas de interacción",
+            "nregistro": "59718",
+            "texto": "Medicamentos contraindicados\nInhibidores de la monoaminooxidasa (IMAOs)\nIMAOs irreversibles (ej. selegilina)\nSertralina no se puede utilizar en combinación con IMAOs irreversibles tales como la selegilina. No debe iniciarse el tratamiento con sertralina hasta al menos 14 días después de haber suspendido el tratamiento con un IMAO irreversible. El tratamiento con sertralina se debe suspender al menos 7 días antes de iniciar el tratamiento con un IMAO irreversible (ver sección 4.3).\nInhibidor reversible selectivo de la MAO-A (moclobemida)\nDebido al riesgo de síndrome serotoninérgico, no debe administrarse sertralina en combinación con un IMAO reversible y selectivo, como la moclobemida. Tras el tratamiento con un inhibidor reversible de la MAO, puede establecerse un periodo de retirada más corto, inferior a 14 días, antes de comenzar el tratamiento con sertralina. Se recomienda que el tratamiento con sertralina se suspenda al menos 7 días antes de iniciar el tratamiento con un IMAO reversible (ver sección 4.3).\nIMAO reversible no selectivo (linezolid)\nEl antibiótico linezolid es un IMAO reversible y no selectivo débil y no se debe utilizar en pacientes que estén siendo tratados con sertralina (ver sección 4.3).\nSe han notificado casos de reacciones adversas graves en pacientes en los que el tratamiento con un IMAO (por ejemplo, azul de metileno) se había suspendido recientemente y habían comenzado el tratamiento con sertralina, o en aquellos en los que se acababa de suspender el tratamiento con sertralina antes de comenzar con un IMAO. Estas reacciones incluyeron temblor, mioclono, diaforesis, náuseas, vómitos, rubefacción, mareos, e hipertermia con características semejantes al síndrome neuroléptico maligno, convulsiones y muerte.\nPimozida\nEn un estudio de dosis única con una dosis baja de pimozida (2 mg), se ha observado un aumento de los niveles de pimozida de aproximadamente un 35%. Este incremento en los niveles no se ha asociado a ningún cambio en el electrocardiograma (ECG). Puesto que se desconoce el mecanismo de esta interacción, y dado el estrecho margen terapéutico de la pimozida, está contraindicada la administración concomitante de sertralina y pimozida (ver sección 4.3).\nNo se recomienda la coadministración con sertralina\nDepresores del SNC y alcohol\nLa coadministración de 200 mg de sertralina al día, no potenció los efectos del alcohol, carbamazepina, haloperidol o fenitoína sobre las funciones cognitiva y psicomotora en sujetos sanos. Sin embargo, no se recomienda el uso concomitante de sertralina y alcohol.\nOtros medicamentos serotoninérgicos\nVer sección 4.4.\nSe recomienda tener precaución con el uso de opioides [p.ej. fentanilo (utilizado en anestesia general o en el tratamiento del dolor crónico)], y otros medicamentos serotoninérgicos (incluyendo otros antidepresivos serotoninérgicos, anfetaminas, triptanes).\nPrecauciones especiales\nMedicamentos que prolongan el intervalo QT\nEl riesgo de prolongación del QTc y/o de arritmias ventriculares (p.ej. TdP) puede aumentar con el uso concomitante de otros medicamentos que prolonguen el intervalo QTc (p.ej. algunos antipsicóticos y antibióticos) (ver secciones 4.4 y 5.1).\nLitio\nEn un estudio controlado con placebo en voluntarios sanos, la administración conjunta de sertralina y litio no alteró significativamente la farmacocinética del litio, pero dio como resultado un incremento de los temblores en relación con placebo, indicando una posible interacción farmacodinámica. Se recomienda monitorizar adecuadamente a los pacientes cuando se administre sertralina junto con litio.\nFenitoína\nUn ensayo clínico controlado con placebo realizado en voluntarios sanos sugiere que la administración crónica de 200 mg/día de sertralina, no produce inhibición clínicamente significativa en el metabolismo de fenitoína. No obstante, puesto que se han revelado casos de una elevada exposición a fenitoína en pacientes en tratamiento con sertralina, se recomienda monitorizar las concentraciones plasmáticas de fenitoína tras el inicio del tratamiento con sertralina así como realizar los ajustes apropiados de la dosis de fenitoína. Además, la administración conjunta de fenitoína, un inductor conocido del CYP3A4, puede causar una disminución en los niveles plasmáticos de sertralina.\nMetamizol\nLa administración concomitante de sertralina con metamizol, que es un inductor de las enzimas metabolizadoras, incluidos CYP2B6 y CYP3A4, puede causar una disminución de las concentraciones plasmáticas de sertralina con una posible disminución de la eficacia clínica. Por lo tanto, se recomienda precaución cuando se administren metamizol y sertralina simultáneamente; la respuesta clínica y/o los niveles del medicamento se deben controlar según corresponda.\nTriptanes\nDurante la experiencia post-comercialización se han notificado casos raros en los que se describían pacientes con debilidad, hiperreflexia, descoordinación, confusión, ansiedad y agitación tras la administración de sertralina y sumatriptán. Los síntomas del síndrome serotoninérgico pueden presentarse también con otros medicamentos de la misma clase (triptanes). Si el tratamiento concomitante de sertralina y triptanes está clínicamente justificado, se recomienda hacer un apropiado seguimiento del paciente (ver sección 4.4).\nWarfarina\nLa administración conjunta de 200 mg de sertralina al día con warfarina produjo un pequeño incremento, aunque estadísticamente significativo, del tiempo de protrombina, que puede, en algunos casos raros, alterar el valor de INR.\nPor consiguiente, se debe monitorizar cuidadosamente el tiempo de protrombina cuando se inicie o se interrumpa el tratamiento con sertralina.\nOtras interacciones con medicamentos, digoxina, atenolol, cimetidina\nLa administración conjunta con cimetidina provocó una disminución sustancial del aclaramiento de sertralina. Se desconoce el significado clínico de estos cambios. Sertralina no tiene ningún efecto sobre la acción beta-bloqueante del atenolol. No se ha observado interacción de sertralina, a dosis de 200 mg al día, con digoxina.\nMedicamentos que afectan a la función plaquetaria\nEl riesgo de hemorragias puede verse aumentado cuando se administran de forma concomitante con ISRS, entre los que se incluye sertralina, medicamentos que actúan sobre la función plaquetaria (por ejemplo AINES, acido acetilsalicílico y ticlopidina) u otros medicamentos que pueden aumentar el riesgo de hemorragias (ver sección 4.4).\nBloqueantes neuromusculares\nLos ISRS pueden reducir la actividad plasmática de la colinesterasa dando lugar a una prolongación de la acción bloqueante neuromuscular de mivacurio o de otros agentes bloqueantes neuromusculares.\nMedicamentos metabolizados por el citocromo P450\nSertralina puede actuar como un inhibidor leve-moderado del CYP 2D6. El tratamiento crónico con 50 mg de sertralina al día mostró una elevación moderada (23%-37% de media) de los niveles plasmáticos de la desipramina en el estado estacionario (un marcador de la actividad enzimática del isoenzima CYP 2D6). Especialmente a dosis altas de sertralina, se pueden presentar interacciones clínicas relevantes con otros sustratos del CYP 2D6 con un estrecho margen terapéutico como los antiarrítmicos tipo 1C, tales como la propafenona y flecainida, los antidepresivos tricíclicos y los antipsicóticos típicos.\nSertralina no actúa como inhibidor del CYP 3A4, CYP 2C9, CYP 2C19, y CYP 1A2 de manera clínicamente significativa. Este hecho se ha confirmado en estudios de interacciones in vivo con sustratos de CYP3A4 (cortisol endógeno, carbamazepina, terfenadina, alprazolam), el sustrato del CYP2C19, diazepam, y los sustratos del CYP2C9 como la tolbutamida, glibenclamida y fenitoína.\nEstudios in vitro indican que sertralina tiene un potencial pequeño o nulo para inhibir el CYP 1A2.\nEn un estudio cruzado realizado en ocho pacientes japoneses sanos, la ingesta de 3 vasos de zumo de pomelo al día aumentó los niveles plasmáticos de sertralina en aproximadamente el 100%. Por lo tanto, la administración de zumo de pomelo debe evitarse durante el tratamiento con sertralina (ver sección 4.4).\nDe acuerdo al estudio de interacción con zumo de pomelo, no se puede excluir que la administración concomitante de sertralina e inhibidores potentes del CYP3A4, como por ejemplo, inhibidores de la proteasa, ketoconazol, itraconazol, posaconazol, voriconazol, claritromicina, telitromicina y nefazodona, dé lugar incluso a incrementos superiores en la exposición de sertralina. Esto también concierne a inhibidores moderados del CYP3A4, como por ejemplo, aprepitant, eritromicina, fluconazol, verapamilo y diltiazem. La ingesta de inhibidores potentes del CYP3A4 se debe evitar durante el tratamiento con sertralina.\nNo se puede excluir que los inductores del CYP3A4, como por ejemplo, fenobarbital, carbamazepina, hierba de San Juan y rifampicina puedan causar una reducción de los niveles plasmáticos de sertralina.\nEn las personas que son metabolizadores lentos de CYP2C19, los niveles plasmáticos de sertralina se aumentan aproximadamente en un 50% en comparación con aquellos que son metabolizadores rápidos (ver sección 5.2). No se puede excluir la interacción con inhibidores potentes del CYP2C19, como por ejemplo, omeprazol, lansoprazol, pantoprazol, rabeprazol, fluoxetina, fluvoxamina.\nSertralina concentrado oral y disulfiram\nLa formulación del concentrado oral contiene una pequeña cantidad de alcohol. Mientras persistan los niveles de disulfiram, o la actividad de la acetaldehído deshidrogenasa esté reducida, la ingestión de etanol producirá una reacción adversa. Normalmente este efecto suele durar aproximadamente una semana cuando se administran dosis estándar, sin embargo, dependiendo de la función hepática, este efecto podría mantenerse hasta dos semanas después de la última dosis de disulfiram. Por tanto, sertralina concentrado para solución oral no debe utilizarse en combinación con disulfiram o en los 14 días siguientes a la interrupción del tratamiento con disulfiram (ver secciones 4.3 y 4.4).",
+            "distance": 0.15536117553710938
+          }
+        ],
+        "response": {
+          "status": "found",
+          "description": "La combinación de sertralina con warfarina puede aumentar ligeramente el tiempo de protrombina, alterando el INR, por lo que se recomienda monitorizar el tiempo de protrombina.",
+          "citations": [
+            {
+              "nregistro": "59718",
+              "seccion": "4.5",
+              "literal_quote": "La administración conjunta de 200 mg de sertralina al día con warfarina produjo un pequeño incremento, aunque estadísticamente significativo, del tiempo de protrombina, que puede, en algunos casos raros, alterar el valor de INR. Por consiguiente, se debe monitorizar cuidadosamente el tiempo de protrombina cuando se inicie o se interrumpa el tratamiento con sertralina."
+            }
+          ],
+          "interaction_detected": true
+        },
+        "source_hit": true,
+        "source_recall": 1.0,
+        "status_match": true,
+        "interaction_match": true,
+        "seconds": 2.683
+      },
+      {
+        "id": "H02",
+        "case": {
+          "id": "H02",
+          "split": "evaluation",
+          "task": "interaction",
+          "question": "Paciente E5: que evidencia relaciona levotiroxina con pantoprazol?",
+          "nregistro": "64014",
+          "expected_sources": [
+            {
+              "nregistro": "64014",
+              "seccion": "4.5"
+            }
+          ],
+          "expected_status": "found",
+          "reference_answer": "Pantoprazol pertenece a los IBP. La ficha de levotiroxina indica menor absorcion por aumento del pH gastrico y vigilancia de funcion tiroidea.",
+          "must_include": [
+            "Relacionar pantoprazol con IBP.",
+            "Menor absorcion y vigilancia tiroidea."
+          ],
+          "must_not_include": [
+            "Afirmar seguridad global del tratamiento.",
+            "Inventar datos del paciente o recomendar cambios de tratamiento."
+          ],
+          "label_review": "AI source-checked; pending Gui/clinical review.",
+          "ingredient": "pantoprazol",
+          "expected_interaction_detected": true,
+          "evidence": [
+            {
+              "fragment_id": "64014_4.5",
+              "text_sha256": "6d028545dcfbf2b70cdd3c25b573f04d11d4436a9817c9afe34abff985d075ce",
+              "source_url": "https://cima.aemps.es/cima/dochtml/ft/64014/FT_64014.html",
+              "source_checked_on": "2026-11-27"
+            }
+          ],
+          "known_limitation": "Evidence names the medicine class, not the literal ingredient. The current mention filter can miss this. Keep the positive label.",
+          "additional_evidence": "Local nomenclator: 74483 pantoprazol ATC A02BC02 (PPI).",
+          "patient_file": "data/pacientes/paciente_E5.json"
+        },
+        "k": 5,
+        "status": "not_found",
+        "reason": "no_evidence",
+        "fragments": [],
+        "response": {
+          "status": "not_found",
+          "description": "No se encontró información relevante en los fragmentos consultados.",
+          "citations": []
+        },
+        "source_hit": false,
+        "source_recall": 0.0,
+        "status_match": false,
+        "interaction_match": false,
+        "seconds": 0.418
+      },
+      {
+        "id": "H03",
+        "case": {
+          "id": "H03",
+          "split": "evaluation",
+          "task": "interaction",
+          "question": "Que matiz es necesario al revisar pantoprazol con warfarina?",
+          "nregistro": "74483",
+          "expected_sources": [
+            {
+              "nregistro": "74483",
+              "seccion": "4.5"
+            }
+          ],
+          "expected_status": "found",
+          "reference_answer": "Aunque los estudios farmacocineticos fueron negativos, hubo notificaciones posteriores de cambios del INR y la ficha contempla seguimiento.",
+          "must_include": [
+            "Distinguir estudios negativos de notificaciones posteriores.",
+            "Cambios del INR y vigilancia."
+          ],
+          "must_not_include": [
+            "Afirmar seguridad global del tratamiento.",
+            "Inventar datos del paciente o recomendar cambios de tratamiento."
+          ],
+          "label_review": "AI source-checked; pending Gui/clinical review.",
+          "ingredient": "warfarina",
+          "expected_interaction_detected": true,
+          "evidence": [
+            {
+              "fragment_id": "74483_4.5",
+              "text_sha256": "0f97c4b96dcb77ad441aec46df7143c593fb43d1b66848c71bf1100eef02e1de",
+              "source_url": "https://cima.aemps.es/cima/dochtml/ft/74483/FT_74483.html",
+              "source_checked_on": "2026-11-27"
+            }
+          ]
+        },
+        "k": 5,
+        "status": "found",
+        "reason": null,
+        "fragments": [
+          {
+            "id": "74483_4.5",
+            "nombre": "NORMOGASTROL 20 mg COMPRIMIDOS GASTRORRESISTENTES",
+            "seccion": "4.5",
+            "nregistro": "74483",
+            "titulo": "Interacción con otros medicamentos y otras formas de interacción",
+            "texto": "Normogastrol 20 mg puede reducir la absorción de sustancias activas cuya biodisponibilidad es pH-gastrodependiente (ej: Ketoconazol).\nSe ha demostrado que la administración conjunta de 300 mg de atazanavir/100 mg ritonavir con omeprazol (40 mg una vez al día) o 400 mg de atazanavir con lansoprazol (60 mg en una única dosis) a voluntarios sanos produjo una reducción sustancial de la biodisponibilidad de atazanavir. La absorción de atazanavir es pH dependiente. Por lo tanto, pantoprazol no debe ser administrado de forma conjunta con atazanavir (ver sección 4.3).\nPantoprazol se metaboliza en el hígado mediante el sistema enzimático del citocromo P450. No puede excluirse una interacción de pantoprazol con otras sustancias que se metabolizan mediante el mismo sistema enzimático. Sin embargo, no se han observado interacciones clínicamente relevantes, en ensayos específicos realizados con: carbamazepina, cafeína, diazepam, diclofenaco, digoxina, etanol, glibenclamida, metoprolol, naproxeno, nifedipino, fenitoína, piroxicam, teofilina y anticonceptivos orales que contengan levonorgestrel y etinilestradiol.\nAunque en los estudios de farmacocinética clínica no se han observado interacciones durante la administración de forma concomitante de fenprocumón o warfarina, se han notificado algunos casos aislados de cambios en el INR (Índice Internacional Normalizado) durante el tratamiento concomitante en la etapa postcomercialización. Por eso, en pacientes tratados con anticoagulantes cumarínicos (ej: fenprocumón o warfarina) se recomienda la monitorización del tiempo de protrombina/INR tras el comienzo, finalización o durante el uso irregular de pantoprazol.\nNo se observaron interacciones con antiácidos administrados de forma concomitante.",
+            "distance": 0.11945390701293945
+          }
+        ],
+        "response": {
+          "status": "found",
+          "description": "Se menciona que el uso concomitante de pantoprazol con warfarina puede provocar cambios aislados en el INR, por lo que se recomienda monitorizar el tiempo de protrombina/INR.",
+          "citations": [
+            {
+              "nregistro": "74483",
+              "seccion": "4.5",
+              "literal_quote": "Aunque en los estudios de farmacocinética clínica no se han observado interacciones durante la administración de forma concomitante de fenprocumón o warfarina, se han notificado algunos casos aislados de cambios en el INR (Índice Internacional Normalizado) durante el tratamiento concomitante en la etapa postcomercialización. Por eso, en pacientes tratados con anticoagulantes cumarínicos (ej: fenprocumón o warfarina) se recomienda la monitorización del tiempo de protrombina/INR tras el comienzo, finalización o durante el uso irregular de pantoprazol."
+            }
+          ],
+          "interaction_detected": true
+        },
+        "source_hit": true,
+        "source_recall": 1.0,
+        "status_match": true,
+        "interaction_match": true,
+        "seconds": 2.577
+      },
+      {
+        "id": "H04",
+        "case": {
+          "id": "H04",
+          "split": "evaluation",
+          "task": "general",
+          "question": "Paciente con diarrea, sangre en heces y fiebre elevada pregunta por loperamida. Que limitacion recoge la ficha?",
+          "nregistro": "87970",
+          "expected_sources": [
+            {
+              "nregistro": "87970",
+              "seccion": "4.3"
+            }
+          ],
+          "expected_status": "found",
+          "reference_answer": "La ficha excluye loperamida como tratamiento principal de disenteria aguda caracterizada por esos signos.",
+          "must_include": [
+            "Reconocer la restriccion.",
+            "No diagnosticar la causa de la diarrea."
+          ],
+          "must_not_include": [
+            "Afirmar seguridad global del tratamiento.",
+            "Inventar datos del paciente o recomendar cambios de tratamiento."
+          ],
+          "label_review": "AI source-checked; pending Gui/clinical review.",
+          "sections": [
+            "4.3"
+          ],
+          "evidence": [
+            {
+              "fragment_id": "87970_4.3",
+              "text_sha256": "c8f49012b614c7847cf98107357c1aa130e0aaa4657c096e8e514ca58c75079e",
+              "source_url": "https://cima.aemps.es/cima/dochtml/ft/87970/FT_87970.html",
+              "source_checked_on": "2026-11-27"
+            }
+          ]
+        },
+        "k": 5,
+        "status": "found",
+        "reason": null,
+        "fragments": [
+          {
+            "id": "87970_4.3",
+            "seccion": "4.3",
+            "nregistro": "87970",
+            "titulo": "Contraindicaciones",
+            "nombre": "LOPERAMIDA AUROVITAS 2 MG CAPSULAS DURAS",
+            "texto": "Hipersensibilidad al principio activo o a alguno de los demás excipientes incluidos en la sección 6.1\nNo se debe utilizar en niños menores de 12 años.\nNo debe utilizarse como terapia principal en:\npacientes con disentería aguda, caracterizada por la presencia de sangre en heces y fiebre elevada,\npacientes con colitis ulcerosa aguda,\npacientes con enterocolitis bacteriana causada por organismos invasivos incluyendo Salmonella, Shigella y Campylobacter,\npacientes con colitis pseudomembranosa asociada al tratamiento con antibióticos de amplio espectro.\nLoperamida no debe administrarse cuando se quiera evitar la inhibición del peristaltismo debido a un posible riesgo de secuelas significativas, como íleo, megacolon y megacolon tóxico.\nSe debe discontinuar rápidamente el tratamiento con loperamida si se presenta estreñimiento, distensión abdominal o desarrollo del íleo.",
+            "distance": 0.10663056373596191
+          }
+        ],
+        "response": {
+          "status": "found",
+          "description": "La ficha indica que la loperamida no debe usarse como terapia principal en pacientes con disentería aguda, caracterizada por sangre en heces y fiebre elevada.",
+          "citations": [
+            {
+              "nregistro": "87970",
+              "seccion": "4.3",
+              "literal_quote": "No debe utilizarse como terapia principal en: pacientes con disentería aguda, caracterizada por la presencia de sangre en heces y fiebre elevada"
+            }
+          ]
+        },
+        "source_hit": true,
+        "source_recall": 1.0,
+        "status_match": true,
+        "interaction_match": null,
+        "seconds": 0.905
+      },
+      {
+        "id": "H05",
+        "case": {
+          "id": "H05",
+          "split": "evaluation",
+          "task": "general",
+          "question": "Con esta ficha de clopidogrel, puedes confirmar el genotipo CYP2C19 de mi paciente?",
+          "nregistro": "71622",
+          "expected_sources": [],
+          "expected_status": "not_found",
+          "reference_answer": "La ficha no permite determinar el genotipo individual; hace falta informacion del paciente.",
+          "must_include": [
+            "Reconocer que el genotipo no fue aportado.",
+            "No inferir un resultado genetico de una advertencia general."
+          ],
+          "must_not_include": [
+            "Afirmar seguridad global del tratamiento.",
+            "Inventar datos del paciente o recomendar cambios de tratamiento."
+          ],
+          "label_review": "AI source-checked; pending Gui/clinical review.",
+          "sections": [
+            "4.4"
+          ],
+          "evidence": [],
+          "absence_reason": "Patient-specific information was not supplied; drug documentation cannot establish it."
+        },
+        "k": 5,
+        "status": "not_found",
+        "reason": "insufficient_evidence",
+        "fragments": [
+          {
+            "id": "71622_4.4",
+            "nregistro": "71622",
+            "seccion": "4.4",
+            "nombre": "CLOPIDOGREL CINFAMED 75 mg COMPRIMIDOS RECUBIERTOS CON PELICULA EFG",
+            "titulo": "Advertencias y precauciones especiales de empleo",
+            "texto": "Hemorragia y trastornos hematológicos\nDebido al riesgo de hemorragia y de reacciones adversas hematológicas, en el caso de que durante el tratamiento aparezcan síntomas clínicos que sugieran hemorragia, se debe valorar rápidamente la necesidad de realizar un hemograma y/u otras pruebas que se consideren apropiadas (ver sección 4.8). Al igual que ocurre con otros medicamentos antiagregantes, clopidogrel se debe administrar con precaución en pacientes que presenten un riesgo incrementado de hemorragia debido a traumatismo, por cirugía o bien derivado de otras patologías, así como en pacientes a los que se administra clopidogrel junto con AAS, heparina, inhibidores de la glucoproteína IIb/IIIa o fármacos antiinflamatorios no esteroideos (AINEs), incluidos los inhibidores de la COX-2 o los inhibidores selectivos de la recaptación de serotonina (ISRS) o inductores potentes de CYP2C19 u otros medicamentos asociados con el riesgo de hemorragia como pentoxifilina (ver sección 4.5). Debido al aumento del riesgo de hemorragia, no se recomienda el tratamiento antiplaquetario triple (clopidogrel + AAS + dipiridamol) para la prevención secundaria de accidente cerebrovascular en pacientes con accidente cerebrovascular isquémico agudo no cardioembólico o AIT (ver sección 4.5 y sección 4.8).\nLos pacientes deben ser cuidadosamente vigilados con el fin de detectar cualquier signo de hemorragia, incluyendo hemorragia oculta, especialmente durante las primeras semanas de tratamiento y/o tras cirugía cardíaca invasiva o cirugía. No se recomienda la administración de clopidogrel junto con anticoagulantes orales debido a que puede aumentar la intensidad de las hemorragias (ver sección 4.5).\nSi el paciente se va a someter a una intervención quirúrgica programada y temporalmente no se desea un efecto antiagregante, la administración de clopidogrel se debe suspender 7 días antes de la intervención.\nAntes de someterse a cualquier intervención quirúrgica y antes de iniciar cualquier otro tratamiento, los pacientes deben informar a su médico y a su odontólogo de que están tomando clopidogrel. Clopidogrel prolonga el tiempo de hemorragia y se debe administrar con precaución en pacientes que presenten lesiones propensas a sangrar (especialmente las gastrointestinales e intraoculares).\nSe debe advertir a los pacientes sobre la posibilidad de que las hemorragias sean más prolongadas cuando estén en tratamiento con clopidogrel (solo o en combinación con AAS), y que deben informar a su médico de cualquier hemorragia no habitual (tanto en localización como en duración).\nNo se recomienda el uso de clopidogrel en dosis de carga de 600 mg en pacientes con síndrome coronario agudo sin elevación del segmento ST y en pacientes ≥75 años de edad debido al aumento del riesgo de hemorragia en esta población.\nDebido a los datos clínicos limitados en pacientes ≥75 años con ICP IAMSEST, y al aumento del riesgo de sangrado, el uso de la dosis de carga de 600 mg de clopidogrel debe considerarse solo después de una evaluación individual del riesgo de sangrado del paciente por parte del médico.\nPúrpura Trombótica Trombocitopénica (PTT)\nMuy raramente se han notificado casos de púrpura trombótica trombocitopénica (PTT) tras la administración de clopidogrel, en ocasiones tras una exposición corta. La PTT se caracteriza por trombocitopenia y anemia hemolítica microangiopática asociada con alteraciones neurológicas, disfunción renal y fiebre. Se trata de una enfermedad potencialmente mortal que requiere tratamiento inmediato incluida la necesidad de plasmaféresis.\nHemofilia adquirida\nSe han notificado casos de hemofilia adquirida después de la administración de clopidogrel. Debe tenerse en consideración la hemofilia adquirida, en los casos aislados y confirmados de Tiempo de Tromboplastina Parcial activado (TTPa) con o sin hemorragia. Los pacientes con diagnóstico confirmado de hemofilia adquirida deben ser controlados y tratados por especialistas y el tratamiento con clopidogrel debe interrumpirse.\nInfarto cerebral isquémico reciente\nInicio de la terapia\nEn pacientes con ACV isquémico agudo menor o con AIT de riesgo moderado a alto, la terapia antiplaquetaria dual (clopidogrel y AAS) debe iniciarse no más tarde de 24 horas después de la aparición del evento.\nNo hay datos en cuanto al beneficio-riesgo de la terapia antiplaquetaria dual a corto plazo en pacientes con ACV isquémico agudo menor o con AIT de riesgo moderado a alto, con antecedentes de hemorragia intracraneal (no traumática).\nEn pacientes con ACV isquémico no menor, la monoterapia con clopidogrel debe iniciarse solo después de los primeros 7 días del evento.\nPacientes con ACV isquémico no menores (NIHSS >4).\nDebido a la falta de datos, no se recomienda el uso de terapia antiplaquetaria dual (ver sección 4.1).\nACV isquémico menor reciente o AIT de riesgo moderado a alto en pacientes para los que está indicada o planificada una intervención\nNo hay datos que apoyen el uso de la terapia antiplaquetaria dual en pacientes para los que está indicado el tratamiento con endarterectomía carotídea o trombectomía intravascular, o en pacientes planificados para trombólisis o terapia anticoagulante. No se recomienda la terapia antiplaquetaria dual en estas situaciones.\nCitocromo P450 2C19 (CYP2C19)\nFarmacogenética: En pacientes que son metabolizadores lentos del CYP2C19, clopidogrel a las dosis recomendadas es metabolizado en menor cantidad a metabolito activo de clopidogrel y tiene un menor efecto sobre la función plaquetaria. Existen pruebas para identificar el genotipo CYP2C19 del paciente.\nDebido a que clopidogrel es parcialmente metabolizado a su metabolito activo por el CYP2C19, sería esperable que el uso de medicamentos que inhiben la actividad de esta enzima, den lugar a una reducción de los niveles del metabolito activo de clopidogrel. La relevancia clínica de esta interacción es incierta. Como precaución debe desaconsejarse el uso concomitante de inhibidores fuertes o moderados del CYP2C19 (ver sección 4.5 para la lista de inhibidores del CYP2C19, ver también sección 5.2).\nSería esperable que el uso de medicamentos que inducen la actividad de CYP2C19 den lugar a un aumento de los niveles del metabolito activo de clopidogrel y podrían potenciar el riesgo de hemorragia. Como precaución, se debe desaconsejar el uso concomitante de inductores potentes de CYP2C19 (ver\nsección 4.5).\nSustratos del CYP2C8\nSe requiere precaución en pacientes tratados de forma concomitante con clopidogrel y medicamentos sustratos del CYP2C8 (ver sección 4.5).\nReacciones cruzadas entre tienopiridinas:\nSe debe evaluar si los pacientes tienen antecedentes de hipersensibilidad a tienopiridinas (como clopidogrel, ticlopidina, prasugrel) debido a que se ha notificado reactividad cruzada entre tienopiridinas (ver sección 4.8). Las tienopiridinas pueden causar reacciones alérgicas de moderadas a graves como: rash, angioedema y reacciones cruzadas hematológicas como trombocitopenia y neutropenia Los pacientes que hayan tenido anteriormente una reacción alérgica y/o hematológica a una tienopiridina pueden tener un mayor riesgo de desarrollar la misma u otra reacción a otra tienopiridina.\nSe aconseja la monitorización de los signos de hipersensibilidad en pacientes con alergia conocida a tienopiridinas.\nInsuficiencia renal\nLa experiencia terapéutica con clopidogrel es limitada en pacientes con insuficiencia renal. Por tanto, clopidogrel debe utilizarse con precaución en estos pacientes (ver sección 4.2).\nInsuficiencia hepática\nLa experiencia también es limitada en pacientes con insuficiencia hepática moderada que pueden sufrir diátesis hemorrágicas. Por tanto, clopidogrel se debe administrar con precaución a estos pacientes (ver sección 4.2).\nClopidogrel cinfamed contiene isomalta\nLos pacientes con intolerancia hereditaria a la fructosa no deben tomar este medicamento.\nClopidogrel cinfamed contiene sacarosa\nLos pacientes con intolerancia hereditaria a la fructosa, problemas de absorción a la glucosa o galactosa, o insuficiencia de sacarasa-isomaltasa, no deben tomar este medicamento.",
+            "distance": 0.12091058492660522
+          }
+        ],
+        "response": {
+          "status": "not_found",
+          "description": "La ficha no contiene información sobre el genotipo CYP2C19 del paciente.",
+          "citations": []
+        },
+        "source_hit": null,
+        "source_recall": null,
+        "status_match": true,
+        "interaction_match": null,
+        "seconds": 13.15
+      }
+    ]
+  },
+  "integration": {
+    "passing_tests": 235,
+    "unexpected_failures": 0,
+    "expected_failures": 15,
+    "medicines": 23,
+    "fragments": 128
+  },
+  "data_provenance": {
+    "benchmark_fragments": 99,
+    "benchmark_registrations": 18,
+    "benchmark_local_sha256": "9aadcc865542d7c445156fdc3d893341a2a6f84599823042b240614d2ab0c4a2",
+    "integrated_sha256": "0585d90b75d128fdc2f10ac84265d7d754d0617fc66746f62b6eb13373d9978b",
+    "manifest_hash_discrepancy": true
+  }
+}
